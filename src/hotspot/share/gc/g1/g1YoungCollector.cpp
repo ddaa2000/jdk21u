@@ -762,7 +762,7 @@ void G1YoungCollector::evacuate_initial_collection_set(G1ParScanThreadStateSet* 
 class G1EvacuateOptionalRegionsTask : public G1EvacuateRegionsBaseTask {
 
   void scan_roots(G1ParScanThreadState* pss, uint worker_id) {
-    log_info(gc) ("Step into G1EvacuateOptionalRegionsTask");
+    // log_info(gc) ("Step into G1EvacuateOptionalRegionsTask");
     _g1h->rem_set()->scan_heap_roots(pss, worker_id, G1GCPhaseTimes::OptScanHR, G1GCPhaseTimes::OptObjCopy, true /* remember_already_scanned_cards */);
     _g1h->rem_set()->scan_collection_set_regions(pss, worker_id, G1GCPhaseTimes::OptScanHR, G1GCPhaseTimes::OptCodeRoots, G1GCPhaseTimes::OptObjCopy);
   }
