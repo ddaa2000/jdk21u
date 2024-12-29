@@ -61,3 +61,9 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_post_entry(volatile G1CardTa
   G1DirtyCardQueue& queue = G1ThreadLocalData::dirty_card_queue(thread);
   G1BarrierSet::dirty_card_queue_set().enqueue(queue, card_addr);
 JRT_END
+
+// Haoran: modify
+// G1 post write barrier slowpath
+JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry(oopDesc* new_val, JavaThread* thread))
+  G1ThreadLocalData::prefetch_queue(thread).enqueue(new_val);
+JRT_END

@@ -1148,3 +1148,10 @@ void GenCollectedHeap::ensure_parsability(bool retire_tlabs) {
   GenEnsureParsabilityClosure ep_cl;
   generation_iterate(&ep_cl, false);
 }
+
+// debug - prefetch
+void GenCollectedHeap::prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ){
+
+  guarantee(false, "%s, Can NOT reach here.\n",__func__);
+
+}

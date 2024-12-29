@@ -156,6 +156,7 @@ void G1BarrierSet::on_thread_attach(Thread* thread) {
   // set the active field of the SATB queue to true.  That involves
   // copying the global is_active value to this thread's queue.
   satbq.set_active(_satb_mark_queue_set.is_active());
+  G1ThreadLocalData::prefetch_queue(thread).set_active(_satb_mark_queue_set.is_active()); //hua: todo modify
 }
 
 void G1BarrierSet::on_thread_detach(Thread* thread) {

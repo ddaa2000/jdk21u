@@ -287,6 +287,11 @@ public:
   // "CollectedHeap" can use in the implementation of its virtual
   // functions.
 
+  // debug - prefetch support
+  // fake implementatio
+  void prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param );
+
+
   class GenClosure : public StackObj {
    public:
     virtual void do_generation(Generation* gen) = 0;

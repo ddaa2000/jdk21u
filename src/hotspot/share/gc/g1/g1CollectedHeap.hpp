@@ -66,6 +66,8 @@
 // heap subsets that will yield large amounts of garbage.
 
 // Forward declarations
+class G1ConcurrentPrefetch;
+class G1ConcurrentPrefetchThread;
 class G1Allocator;
 class G1BatchedTask;
 class G1CardTableEntryClosure;
@@ -168,7 +170,12 @@ class G1CollectedHeap : public CollectedHeap {
   // Testing classes.
   friend class G1CheckRegionAttrTableClosure;
 
+public:
+  size_t _remark_reclaimed_bytes;
+  struct epoch_struct* user_buf;
+
 private:
+  uint _have_done;
   G1ServiceThread* _service_thread;
   G1ServiceTask* _periodic_gc_task;
   G1MonotonicArenaFreeMemoryTask* _free_arena_memory_task;
@@ -784,6 +791,10 @@ private:
 
   G1MonotonicArenaFreePool _card_set_freelist_pool;
 
+    // Haoran: modify
+  BufferNode::Allocator _prefetch_mark_queue_buffer_allocator;
+  G1PrefetchQueueSet  _prefetch_queue_set;
+
 public:
   // After a collection pause, reset eden and the collection set.
   void clear_eden();
@@ -796,6 +807,10 @@ public:
   // The concurrent marker (and the thread it runs in.)
   G1ConcurrentMark* _cm;
   G1ConcurrentMarkThread* _cm_thread;
+
+  // Haoran: modify
+  G1ConcurrentPrefetch* _pf;
+  G1ConcurrentPrefetchThread* _pf_thread;
 
   // The concurrent refiner.
   G1ConcurrentRefine* _cr;
@@ -866,6 +881,11 @@ public:
 
   G1ScannerTasksQueueSet* task_queues() const;
   G1ScannerTasksQueue* task_queue(uint i) const;
+
+    
+  // Haoran: modify
+  G1PrefetchQueueSet& prefetch_queue_set() { return _prefetch_queue_set; }
+
 
   // Create a G1CollectedHeap.
   // Must call the initialize method afterwards.
@@ -1238,6 +1258,16 @@ public:
   void mark_evac_failure_object(uint worker_id, oop obj, size_t obj_size) const;
 
   G1ConcurrentMark* concurrent_mark() const { return _cm; }
+
+  // Haoran: modify
+  G1ConcurrentPrefetch* concurrent_prefetch() const { return _pf; }
+
+  // function paramter enqueu
+  // G1CollectedHeap implementation
+  virtual void prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param );
+
+
+
 
   // Refinement
 

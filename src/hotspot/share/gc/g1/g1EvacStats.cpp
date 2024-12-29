@@ -136,6 +136,16 @@ size_t G1EvacStats::desired_plab_size(uint no_of_gc_workers) const {
       return _default_plab_size;
   }
   return align_object_size(clamp(_desired_net_plab_size / no_of_gc_workers, min_size(), max_size()));
+
+  //hua: todo we should align with this:
+  // Calculates plab size for current number of gc worker threads.
+  // size_t PLABStats::desired_plab_sz(uint no_of_gc_workers) {
+  //   // return align_object_size(MIN2(MAX2(min_size(), _desired_net_plab_sz / no_of_gc_workers), max_size()));
+  //   size_t minsize = 1024;
+  //   return align_object_size(MIN2(MAX2(minsize, _desired_net_plab_sz / no_of_gc_workers), max_size()));
+
+  //   // return align_object_size(max_size()); // 64K HeapWord
+  // }
 }
 
 void G1EvacStats::adjust_desired_plab_size() {

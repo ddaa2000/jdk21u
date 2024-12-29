@@ -40,6 +40,10 @@ class G1ScanEvacuatedObjClosure;
 class G1CMTask;
 class ReferenceProcessor;
 
+class G1ConcurrentPrefetch;
+class G1PFTask;
+
+
 class G1ScanClosureBase : public BasicOopIterateClosure {
 protected:
   G1CollectedHeap* _g1h;
@@ -233,5 +237,19 @@ public:
 
   virtual ReferenceIterationMode reference_iteration_mode() { return DO_FIELDS; }
 };
+
+// Haoran: modify
+// Closure for iterating over object fields during concurrent marking
+class G1PFOopClosure : public MetadataVisitingOopIterateClosure {
+  G1CollectedHeap*   _g1h;
+  G1PFTask*          _task;
+public:
+  G1PFOopClosure(G1CollectedHeap* g1h,G1PFTask* task);
+  template <class T> void do_oop_work(T* p);
+  virtual void do_oop(      oop* p) { do_oop_work(p); }
+  virtual void do_oop(narrowOop* p) { do_oop_work(p); }
+};
+
+
 
 #endif // SHARE_GC_G1_G1OOPCLOSURES_HPP

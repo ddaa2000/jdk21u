@@ -160,6 +160,22 @@
   product(uint, ConcGCThreads, 0,                                           \
           "Number of threads concurrent gc will use")                       \
                                                                             \
+  product(uint, PrefetchThreads, 1,                                         \
+          "Number of threads prefetch will use")                            \
+          range(0, max_jint)                                                \
+                                                                            \
+  product(uint, PrefetchNum, 0,                                             \
+          "The maximum objects to be marked during prefetching")            \
+          range(0, max_jint)                                                \
+                                                                            \
+  product(uint, PrefetchSize, 0,                                            \
+          "The maximum size of objects during prefetching")                 \
+          range(0, max_jint)                                                \
+                                                                            \
+  product(uint, PrefetchQueueThreshold, 0,                                  \
+          "The number of objects that remains after cleaning")              \
+          range(0, max_jint)                                                \
+                                                                            \
   product(bool, AlwaysTenure, false,                                        \
           "Always tenure objects in eden (ParallelGC only)")                \
                                                                             \
@@ -593,6 +609,11 @@
           "Minimum heap size (in bytes); zero means use ergonomics")        \
           constraint(MinHeapSizeConstraintFunc,AfterErgo)                   \
                                                                             \
+  /* MemLiner start*/                                                       \
+  product(bool, MemLinerEnableMemPool, false,                               \
+          "Build the Semeru Memory Heap or not. (default false) ")          \
+                                                                            \
+  /* MemLiner end*/                                                         \
   product(size_t, InitialHeapSize, 0,                                       \
           "Initial heap size (in bytes); zero means use ergonomics")        \
           constraint(InitialHeapSizeConstraintFunc,AfterErgo)               \

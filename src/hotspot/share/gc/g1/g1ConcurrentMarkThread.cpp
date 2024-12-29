@@ -113,6 +113,7 @@ class G1ConcPhaseTimer : public GCTraceConcTimeImpl<LogLevel::Info, LOG_TAGS(gc,
 };
 
 void G1ConcurrentMarkThread::run_service() {
+  //hua: todo conc ron?
   _vtime_start = os::elapsedVTime();
 
   while (wait_for_next_cycle()) {

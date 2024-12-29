@@ -423,6 +423,21 @@ class CollectedHeap : public CHeapObj<mtGC> {
   // Perform any cleanup actions necessary before allowing a verification.
   virtual void prepare_for_verify() = 0;
 
+  //
+  // Debug - Prefetch support
+  //
+
+  // A pure virtual function, withi "= 0"
+  // 
+  //
+  // Pass the accessed objects of each functions into each GC implementation's thread prefetch queue.
+  // at most 5 objects instance as roots.
+  // The number of valid parameter is passed via num_of_valid_param
+  // The non-valid parameters should be NULL.
+  virtual void prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ) = 0;
+
+
+
   // Returns the longest time (in ms) that has elapsed since the last
   // time that the whole heap has been examined by a garbage collection.
   jlong millis_since_last_whole_heap_examined();

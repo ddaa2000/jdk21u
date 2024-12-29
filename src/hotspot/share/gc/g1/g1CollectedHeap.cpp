@@ -40,6 +40,7 @@
 #include "gc/g1/g1ConcurrentRefine.hpp"
 #include "gc/g1/g1ConcurrentRefineThread.hpp"
 #include "gc/g1/g1ConcurrentMarkThread.inline.hpp"
+#include "gc/g1/g1ConcurrentPrefetchThread.inline.hpp"
 #include "gc/g1/g1DirtyCardQueue.hpp"
 #include "gc/g1/g1EvacStats.inline.hpp"
 #include "gc/g1/g1FullCollector.hpp"
@@ -115,6 +116,13 @@
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/stack.inline.hpp"
+
+#include <linux/kernel.h>
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <sys/mman.h>  
+#include <sys/errno.h>
+
 
 size_t G1CollectedHeap::_humongous_object_threshold_in_words = 0;
 
@@ -1225,6 +1233,9 @@ public:
 
 G1CollectedHeap::G1CollectedHeap() :
   CollectedHeap(),
+  _remark_reclaimed_bytes(0),
+  user_buf(NULL),
+  _have_done(0),
   _service_thread(nullptr),
   _periodic_gc_task(nullptr),
   _free_arena_memory_task(nullptr),
@@ -1262,6 +1273,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _rem_set(nullptr),
   _card_set_config(),
   _card_set_freelist_pool(G1CardSetConfiguration::num_mem_object_types()),
+  _prefetch_mark_queue_buffer_allocator(G1PrefetchBufferSize, PREFETCH_Q_FL_lock),
+  _prefetch_queue_set(), /*Haoran: modify*/
   _cm(nullptr),
   _cm_thread(nullptr),
   _cr(nullptr),
@@ -1376,8 +1389,61 @@ jint G1CollectedHeap::initialize() {
   // If this happens then we could end up using a non-optimal
   // compressed oops mode.
 
-  ReservedHeapSpace heap_rs = Universe::reserve_heap(reserved_byte_size,
-                                                     HeapAlignment);
+  // ReservedHeapSpace heap_rs = Universe::reserve_heap(reserved_byte_size,
+  //                                                    HeapAlignment);
+
+
+  // MemLiner heap
+  ReservedSpace heap_rs;
+
+  if (MemLinerEnableMemPool) {
+    // Allocate the MemLiner heap at a fixed virtual address
+
+    // max_byte_size is also controlled by -Xmx at CPU server now.
+    heap_rs = Universe::reserve_memliner_memory_pool(max_byte_size, heap_alignment);
+    
+    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, max_byte_size/4096 + 1024, PROT_NONE, MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    if (user_buf == MAP_FAILED) {
+      tty->print("Reserve user_buffer, 0x%lx failed. \n",
+        0x100000000000UL);
+    } else {
+      tty->print("Reserve user_buffer: 0x%lx, bytes_len: 0x%lx \n",
+        (unsigned long)user_buf, max_byte_size/4096 + 1024);
+    }
+    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, max_byte_size/4096 + 1024, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+    if (user_buf == MAP_FAILED) {
+      tty->print("Commit user_buffer, 0x%lx failed. \n", 0x100000000000UL);
+    } else {
+      tty->print("Commit user_buffer: 0x%lx, bytes_len: 0x%lx \n",
+        (unsigned long)user_buf, max_byte_size/4096 + 1024);
+    }
+
+    // #2 Ask kernel to fill the physical pages of the buffer
+    int ret = syscall(457, (unsigned long)user_buf, max_byte_size/4096 + 512);
+    if (ret) {
+      tty->print("syscall error, with code %d\n", ret);
+    }
+    // #3 Check the value of the allcoated data
+    tty->print("epoch %d \n",user_buf->epoch);
+    tty->print("array length %x \n", user_buf->length);
+
+  } else {
+    // The default path
+    // Reserve the maximum.
+
+    // When compressed oops are enabled, the preferred heap base
+    // is calculated by subtracting the requested size from the
+    // 32Gb boundary and using the result as the base address for
+    // heap reservation. If the requested size is not aligned to
+    // HeapRegion::GrainBytes (i.e. the alignment that is passed
+    // into the ReservedHeapSpace constructor) then the actual
+    // base of the reserved heap may end up differing from the
+    // address that was requested (i.e. the preferred heap base).
+    // If this happens then we could end up using a non-optimal
+    // compressed oops mode.
+
+    heap_rs = Universe::reserve_heap(max_byte_size, heap_alignment);
+  }
 
   initialize_reserved_region(heap_rs);
 
@@ -1394,6 +1460,10 @@ jint G1CollectedHeap::initialize() {
     satbqs.set_process_completed_buffers_threshold(G1SATBProcessCompletedThreshold);
     satbqs.set_buffer_enqueue_threshold_percentage(G1SATBBufferEnqueueingThresholdPercent);
   }
+
+  // Haoran: modify
+  prefetch_queue_set().initialize(this, PREFETCH_Q_CBL_mon, &_prefetch_mark_queue_buffer_allocator);
+
 
   // Create space mappers.
   size_t page_size = heap_rs.page_size();
@@ -1477,6 +1547,15 @@ jint G1CollectedHeap::initialize() {
   // (Must do this late, so that "max_[reserved_]regions" is defined.)
   _cm = new G1ConcurrentMark(this, bitmap_storage);
   _cm_thread = _cm->cm_thread();
+
+    // Haoran: modify
+  _pf = new G1ConcurrentPrefetch(this, _cm);
+  // if (_cm == NULL || !_cm->completed_initialization()) {
+  //   vm_shutdown_during_initialization("Could not create/initialize G1ConcurrentMark");
+  //   return JNI_ENOMEM;
+  // }
+  _pf_thread = _pf->pf_thread();
+
 
   // Now expand into the initial heap size.
   if (!expand(init_byte_size, _workers)) {
@@ -1720,12 +1799,61 @@ void G1CollectedHeap::increment_old_marking_cycles_completed(bool concurrent,
   // incorrectly see that a marking cycle is still in progress.
   if (concurrent) {
     _cm_thread->set_idle();
+    // Haoran: Modify
+    _pf_thread->set_idle();
   }
 
   // Notify threads waiting in System.gc() (with ExplicitGCInvokesConcurrent)
   // for a full GC to finish that their wait is over.
   ml.notify_all();
 }
+
+/**
+ * Put the object parameters into current thread's prefetch queue
+ *    
+ * @param   obj1   The 1st object instance, passed from application.
+ * @param   obj2   The 2nd object instance, passed from application.
+ * @param   obj3   The 3rd object instance, passed from application.
+ * @param   obj4   The 4th object instance, passed from application.
+ * @param   obj5   The 5th object instance, passed from application.
+ * @param   num_of_valid_param   the number of valide object parameters. Otehrs are NULL.
+ */
+void G1CollectedHeap::prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ){
+
+  //
+  // Put the obj# into corresponding JavaThread's prefetch queue.
+  // As shown below.
+
+  //debug fucntion, get a useless queue.
+  if(!_cm->concurrent()) return;
+  PrefetchQueue & tmp_queue = G1ThreadLocalData::prefetch_queue(jthread);
+  if(obj1!=NULL)
+    tmp_queue.enqueue((void*)(HeapWord*)obj1);
+  if(obj2!=NULL)
+    tmp_queue.enqueue((void*)(HeapWord*)obj2);
+  if(obj3!=NULL)
+    tmp_queue.enqueue((void*)(HeapWord*)obj3);
+  if(obj4!=NULL)
+    tmp_queue.enqueue((void*)(HeapWord*)obj4);
+  if(obj5!=NULL)
+    tmp_queue.enqueue((void*)(HeapWord*)obj5);
+  void* tmp_obj = NULL;
+  tmp_queue.enqueue(tmp_obj);
+
+//   dirty_card_queue(jthread);
+  // log_debug(prefetch)("%s, JavaThread: 0x%lx \n", __func__, (size_t)jthread);
+//   log_debug(prefetch)("    prarameter obj1 0x%lx\n", (size_t)obj1 );
+//   log_debug(prefetch)("    prarameter obj2 0x%lx\n", (size_t)obj2 );
+//   log_debug(prefetch)("    prarameter obj3 0x%lx\n", (size_t)obj3 );
+//   log_debug(prefetch)("    prarameter obj4 0x%lx\n", (size_t)obj4 );
+//   log_debug(prefetch)("    prarameter obj5 0x%lx\n", (size_t)obj5 );
+//   log_debug(prefetch)("    number of valid prarameters %d\n", num_of_valid_param );
+
+   // log_debug(prefetch)("%s, get the thread local dirty card queue 0x%lx \n", __func__, (size_t)(&tmp_queue) );
+
+}
+
+
 
 // Helper for collect().
 static G1GCCounters collection_counters(G1CollectedHeap* g1h) {
@@ -2394,9 +2522,13 @@ void G1CollectedHeap::start_concurrent_cycle(bool concurrent_operation_is_full_m
   if (concurrent_operation_is_full_mark) {
     _cm->post_concurrent_mark_start();
     _cm_thread->start_full_mark();
+    // Haoran: modify
+    _pf_thread->set_started(); //hua: todo modify
   } else {
     _cm->post_concurrent_undo_start();
     _cm_thread->start_undo_mark();
+    //hua: todo start undo mark?
+
   }
   CGC_lock->notify();
 }

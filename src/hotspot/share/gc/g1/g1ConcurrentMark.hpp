@@ -276,6 +276,14 @@ public:
   bool wait_until_scan_finished();
 };
 
+
+
+// Haoran: Modify
+class G1ConcurrentPrefetch;
+class G1ConcurrentPrefetchThread;
+class G1PFTask;
+
+
 // This class manages data structures and methods for doing liveness analysis in
 // G1's concurrent cycle.
 class G1ConcurrentMark : public CHeapObj<mtGC> {
@@ -288,6 +296,13 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   friend class G1CMRootRegionScanTask;
   friend class G1CMTask;
   friend class G1ConcurrentMarkThread;
+
+  // Haoran: modify
+  friend class G1ConcurrentPrefetch;
+  friend class G1ConcurrentPrefetchThread;
+  friend class G1PFTask;
+  friend class G1PFConcurrentPrefetchingTask;
+  friend class G1CollectedHeap;
 
   G1ConcurrentMarkThread* _cm_thread;     // The thread doing the work
   G1CollectedHeap*        _g1h;           // The heap
@@ -437,7 +452,8 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   // Access / manipulation of the overflow flag which is set to
   // indicate that the global stack has overflown
   bool has_overflown()           { return _has_overflown; }
-  void set_has_overflown()       { _has_overflown = true; }
+  // void set_has_overflown()       { _has_overflown = true; }
+  void set_has_overflown()       {/*Haoran: modify*/ ShouldNotReachHere(); _has_overflown = true; }
   void clear_has_overflown()     { _has_overflown = false; }
   bool restart_for_overflow()    { return _restart_for_overflow; }
 

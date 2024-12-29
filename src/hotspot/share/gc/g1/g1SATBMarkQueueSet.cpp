@@ -117,3 +117,77 @@ public:
 void G1SATBMarkQueueSet::filter(SATBMarkQueue& queue) {
   apply_filter(G1SATBMarkQueueFilterFn(), queue);
 }
+
+// Haoran: modify
+
+G1PrefetchQueueSet::G1PrefetchQueueSet() : _g1h(NULL) {}
+
+void G1PrefetchQueueSet::initialize(G1CollectedHeap* g1h,
+                                    Monitor* cbl_mon,
+                                    BufferNode::Allocator* allocator
+                                    /*size_t process_completed_buffers_threshold,
+                                    uint buffer_enqueue_threshold_percentage,
+                                    Mutex* lock*/) {
+  PrefetchQueueSet::initialize(cbl_mon,
+                               allocator/*,
+                               process_completed_buffers_threshold,
+                               buffer_enqueue_threshold_percentage,
+                               lock*/);
+  _g1h = g1h;
+}
+
+void G1PrefetchQueueSet::handle_zero_index_for_thread(JavaThread* t) {
+  G1ThreadLocalData::prefetch_queue(t).handle_zero_index();
+}
+
+PrefetchQueue& G1PrefetchQueueSet::prefetch_queue_for_thread(JavaThread* const t) const{
+  return G1ThreadLocalData::prefetch_queue(t);
+}
+
+// Should enqueue or not?
+// Should enqueue if it is in the heap
+
+static inline bool requires_marking_prefetch(const void* entry, G1CollectedHeap* g1h) {
+
+  if(g1h->is_in_reserved(entry)) {
+    return true;
+  }
+  return false;
+  // // Includes rejection of NULL pointers.
+  // assert(g1h->is_in_reserved(entry),
+  //        "Non-heap pointer in SATB buffer: " PTR_FORMAT, p2i(entry));
+
+  // HeapRegion* region = g1h->heap_region_containing(entry);
+  // assert(region != NULL, "No region for " PTR_FORMAT, p2i(entry));
+  // if (entry >= region->next_top_at_mark_start()) {
+  //   return false;
+  // }
+
+  // assert(oopDesc::is_oop(oop(entry), true /* ignore mark word */),
+  //        "Invalid oop in SATB buffer: " PTR_FORMAT, p2i(entry));
+
+  // return true;
+}
+
+static inline bool discard_entry_prefetch(const void* entry, G1CollectedHeap* g1h) {
+  return !requires_marking_prefetch(entry, g1h) || g1h->is_marked_next((oop)entry);
+}
+
+// Workaround for not yet having std::bind.
+class G1PrefetchQueueFilterFn {
+  G1CollectedHeap* _g1h;
+
+public:
+  G1PrefetchQueueFilterFn(G1CollectedHeap* g1h) : _g1h(g1h) {}
+
+  // Return true if entry should be filtered out (removed), false if
+  // it should be retained.
+  bool operator()(const void* entry) const {
+    return discard_entry_prefetch(entry, _g1h);
+  }
+};
+
+void G1PrefetchQueueSet::filter(PrefetchQueue* queue) {
+  assert(_g1h != NULL, "SATB queue set not initialized");
+  apply_filter(G1PrefetchQueueFilterFn(_g1h), queue);
+}

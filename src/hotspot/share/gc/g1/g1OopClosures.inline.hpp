@@ -43,6 +43,10 @@
 #include "runtime/prefetch.inline.hpp"
 #include "utilities/align.hpp"
 
+// Haoran: modify
+#include "gc/g1/g1ConcurrentPrefetch.inline.hpp"
+
+
 template <class T>
 inline void G1ScanClosureBase::prefetch_and_push(T* p, const oop obj) {
   // We're not going to even bother checking whether the object is
@@ -271,5 +275,14 @@ template <class T> void G1RebuildRemSetClosure::do_oop_work(T* p) {
     rem_set->add_reference(p, _worker_id);
   }
 }
+
+// Haoran: modify
+template <class T>
+inline void G1PFOopClosure::do_oop_work(T* p) {
+  _task->deal_with_reference(p);
+}
+
+
+
 
 #endif // SHARE_GC_G1_G1OOPCLOSURES_INLINE_HPP

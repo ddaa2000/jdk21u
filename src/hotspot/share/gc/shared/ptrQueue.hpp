@@ -38,6 +38,9 @@
 // the addresses of modified old-generation objects.  This type supports
 // this operation.
 
+// Haoran: modify
+class PrefetchQueue;
+
 class BufferNode;
 class PtrQueueSet;
 class PtrQueue {
@@ -48,7 +51,13 @@ class PtrQueue {
   // The (byte) index at which an object was last enqueued.  Starts at
   // capacity (in bytes) (indicating an empty buffer) and goes towards zero.
   // Value is always pointer-size aligned.
+  // Haoran: modify
+  friend class PrefetchQueue;
+
   size_t _index;
+
+  // Haoran: modify
+  size_t _tail;
 
   // Size of the current buffer, in bytes.
   // Value is always pointer-size aligned.
