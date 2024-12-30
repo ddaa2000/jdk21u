@@ -1273,8 +1273,9 @@ G1CollectedHeap::G1CollectedHeap() :
   _rem_set(nullptr),
   _card_set_config(),
   _card_set_freelist_pool(G1CardSetConfiguration::num_mem_object_types()),
-  _prefetch_mark_queue_buffer_allocator(G1PrefetchBufferSize, PREFETCH_Q_FL_lock),
-  _prefetch_queue_set(), /*Haoran: modify*/
+  // _prefetch_mark_queue_buffer_allocator(G1PrefetchBufferSize, PREFETCH_Q_FL_lock),
+  _prefetch_mark_queue_buffer_allocator("Prefetch Queue Allocator"),
+  _prefetch_queue_set(&_prefetch_mark_queue_buffer_allocator), /*Haoran: modify*/
   _cm(nullptr),
   _cm_thread(nullptr),
   _cr(nullptr),

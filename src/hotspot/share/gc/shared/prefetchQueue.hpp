@@ -27,6 +27,7 @@
 
 #include "gc/shared/ptrQueue.hpp"
 #include "memory/allocation.hpp"
+#include "gc/shared/gc_globals.hpp"
 
 class JavaThread;
 class PrefetchQueueSet;
@@ -82,59 +83,59 @@ public:
     _in_processing = false;
   }
 
-  // Process queue entries and free resources.
-  void flush();
+  // // Process queue entries and free resources.
+  // // void flush();
 
-  // Apply cl to the active part of the buffer.
-  // Prerequisite: Must be at a safepoint.
-  void apply_closure_and_empty(PrefetchBufferClosure* cl);
+  // // Apply cl to the active part of the buffer.
+  // // Prerequisite: Must be at a safepoint.
+  // void apply_closure_and_empty(PrefetchBufferClosure* cl);
 
-  // Overrides PtrQueue::should_enqueue_buffer(). See the method's
-  // definition for more information.
-  virtual bool should_enqueue_buffer();
+  // // Overrides PtrQueue::should_enqueue_buffer(). See the method's
+  // // definition for more information.
+  // virtual bool should_enqueue_buffer();1
 
   // Compiler support.
   static ByteSize byte_offset_of_index() {
     return PtrQueue::byte_offset_of_index<PrefetchQueue>();
   }
-//   using PtrQueue::byte_width_of_index;
+  using PtrQueue::byte_width_of_index;
 
   static ByteSize byte_offset_of_buf() {
     return PtrQueue::byte_offset_of_buf<PrefetchQueue>();
   }
-//   using PtrQueue::byte_width_of_buf;
+  using PtrQueue::byte_width_of_buf;
 
   static ByteSize byte_offset_of_active() {
-    //hua: todo is this right?
     return byte_offset_of(PrefetchQueue, _active);
   }
-//   using PtrQueue::byte_width_of_active;
+
+  static ByteSize byte_width_of_active() { return in_ByteSize(sizeof(bool)); }
 
 
 
 
-  // Haoran: newly written fns
-  void enqueue(volatile void* ptr) {
-    enqueue((void*)(ptr));
-  }
+  // // Haoran: newly written fns
+  // void enqueue(volatile void* ptr) {
+  //   enqueue((void*)(ptr));
+  // }
 
-  // Enqueues the given "obj".
-  void enqueue(void* ptr) {
-    if (!_active) return;
-    // if (!Universe::heap()->is_in_reserved(ptr)) return; hua:todo is this right?
-    enqueue_known_active(ptr);
-  }
+  // // Enqueues the given "obj".
+  // void enqueue(void* ptr) {
+  //   if (!_active) return;
+  //   // if (!Universe::heap()->is_in_reserved(ptr)) return; hua:todo is this right?
+  //   enqueue_known_active(ptr);
+  // }
 
-  void enqueue_known_active(void* ptr)  {
-    while (_index == 0) {
-      handle_zero_index();
-    }
-    assert(_buf != NULL, "postcondition");
-    assert(index() > 0, "postcondition");
-    assert(index() <= capacity(), "invariant");
-    _index -= _element_size;
-    _buf[index()] = ptr;
-  }
+  // void enqueue_known_active(void* ptr)  {
+  //   while (_index == 0) {
+  //     handle_zero_index();
+  //   }
+  //   assert(_buf != NULL, "postcondition");
+  //   assert(index() > 0, "postcondition");
+  //   assert(index() <= capacity(), "invariant");
+  //   _index -= _element_size;
+  //   _buf[index()] = ptr;
+  // }
 
   size_t prefetch_queue_threshold() {
     return PrefetchQueueThreshold;
@@ -170,12 +171,13 @@ public:
       _tail = capacity();
     }
     else {
-      // Set capacity in case this is the first allocation.
-      set_capacity(qset()->buffer_size());
-      // Allocate a new buffer.
-      // _buf = NEW_C_HEAP_ARRAY(void*, qset()->buffer_size(), mtGC)
-      _buf = qset()->allocate_buffer();
-      reset();
+      ShouldNotReachHere();
+      // // Set capacity in case this is the first allocation.
+      // set_capacity(qset()->buffer_size());
+      // // Allocate a new buffer.
+      // // _buf = NEW_C_HEAP_ARRAY(void*, qset()->buffer_size(), mtGC)
+      // _buf = qset()->allocate_buffer();
+      // reset();
     }
     // _in_dequeue = false;
   }
@@ -213,24 +215,44 @@ public:
 };
 
 class PrefetchQueueSet: public PtrQueueSet {
-  PrefetchQueue _shared_prefetch_queue;
+  DEFINE_PAD_MINUS_SIZE(1, DEFAULT_CACHE_LINE_SIZE, 0);
+  PaddedEnd<BufferNode::Stack> _list;
+  volatile size_t _count_and_process_flag;
+  // These are rarely (if ever) changed, so same cache line as count.
+  size_t _process_completed_buffers_threshold;
   size_t _buffer_enqueue_threshold;
+  // SATB is only active during marking.  Enqueuing is only done when active.
+  bool _all_active;
+  DEFINE_PAD_MINUS_SIZE(2, DEFAULT_CACHE_LINE_SIZE, 4 * sizeof(size_t));
+
+  // BufferNode* get_completed_buffer();
+  // void abandon_completed_buffers();
+
+  // PrefetchQueue _shared_prefetch_queue;
+  // size_t _buffer_enqueue_threshold;
 
 
 protected:
-  PrefetchQueueSet();
-  ~PrefetchQueueSet() {}
+  PrefetchQueueSet(BufferNode::Allocator* allocator);
+  ~PrefetchQueueSet();
+
+  void handle_zero_index(PrefetchQueue& queue);
+
+  // // Return true if the queue's buffer should be enqueued, even if not full.
+  // // The default method uses the buffer enqueue threshold.
+  // bool should_enqueue_buffer(PrefetchQueue& queue);
+
 
   template<typename Filter>
   void apply_filter(Filter filter, PrefetchQueue* queue) {
     queue->apply_filter(filter);
   }
 
-  void initialize(Monitor* cbl_mon,
-                  BufferNode::Allocator* allocator/*,
-                  size_t process_completed_buffers_threshold,
-                  uint buffer_enqueue_threshold_percentage,
-                  Mutex* lock*/);
+  // void initialize(Monitor* cbl_mon,
+  //                 BufferNode::Allocator* allocator/*,
+  //                 size_t process_completed_buffers_threshold,
+  //                 uint buffer_enqueue_threshold_percentage,
+  //                 Mutex* lock*/);
 
 public:
   virtual PrefetchQueue& prefetch_queue_for_thread(JavaThread* const t) const = 0;
@@ -242,27 +264,34 @@ public:
   void set_active_all_threads(bool active, bool expected_active);
 
   size_t buffer_enqueue_threshold() const { return _buffer_enqueue_threshold; }
+
+  // // Filter all the currently-active SATB buffers.
+  // void filter_thread_buffers();
+
+  // // If there exists some completed buffer, pop and process it, and
+  // // return true.  Otherwise return false.  Processing a buffer
+  // // consists of applying the closure to the active range of the
+  // // buffer; the leading entries may be excluded due to filtering.
+  // bool apply_closure_to_completed_buffer(PrefetchBufferClosure* cl);
+
+  void enqueue_known_active(PrefetchQueue& queue, oop obj);
+  
   virtual void filter(PrefetchQueue* queue) = 0;
 
-  // Filter all the currently-active SATB buffers.
-  void filter_thread_buffers();
-
-  // If there exists some completed buffer, pop and process it, and
-  // return true.  Otherwise return false.  Processing a buffer
-  // consists of applying the closure to the active range of the
-  // buffer; the leading entries may be excluded due to filtering.
-  bool apply_closure_to_completed_buffer(PrefetchBufferClosure* cl);
+  virtual void enqueue_completed_buffer(BufferNode* node){
+    ShouldNotReachHere();
+  }
 
 
 
-  PrefetchQueue* shared_prefetch_queue() { return &_shared_prefetch_queue; }
+  // PrefetchQueue* shared_prefetch_queue() { return &_shared_prefetch_queue; }
 
   // If a marking is being abandoned, reset any unprocessed log buffers.
   void abandon_partial_marking();
 };
 
 inline void PrefetchQueue::filter() {
-  static_cast<PrefetchQueueSet*>(qset())->filter(this);
+  static_cast<PrefetchQueueSet*>(_qset)->filter(this);
 }
 
 // Removes entries from the buffer that are no longer needed, as

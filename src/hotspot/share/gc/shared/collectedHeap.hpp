@@ -434,7 +434,9 @@ class CollectedHeap : public CHeapObj<mtGC> {
   // at most 5 objects instance as roots.
   // The number of valid parameter is passed via num_of_valid_param
   // The non-valid parameters should be NULL.
-  virtual void prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ) = 0;
+  virtual void prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ){
+    ShouldNotReachHere();
+  }
 
 
 

@@ -57,112 +57,179 @@ PrefetchQueue::~PrefetchQueue() {
   }
 }
 
-void PrefetchQueue::flush() {
-  // Filter now to possibly save work later.  If filtering empties the
-  // buffer then flush_impl can deallocate the buffer.
-  filter();
-  flush_impl();
-}
+// void PrefetchQueue::flush() {
+//   // Filter now to possibly save work later.  If filtering empties the
+//   // buffer then flush_impl can deallocate the buffer.
+//   filter();
+//   flush_impl();
+// }
 
 // This method will first apply filtering to the buffer. If filtering
 // retains a small enough collection in the buffer, we can continue to
 // use the buffer as-is, instead of enqueueing and replacing it.
 
-bool PrefetchQueue::should_enqueue_buffer() {
-  assert(_lock == NULL || _lock->owned_by_self(),
-         "we should have taken the lock before calling this");
+// bool PrefetchQueue::should_enqueue_buffer() {
+//   assert(_lock == NULL || _lock->owned_by_self(),
+//          "we should have taken the lock before calling this");
 
-  // This method should only be called if there is a non-NULL buffer
-  // that is full.
-  assert(index() == 0, "pre-condition");
-  assert(_buf != NULL, "pre-condition");
+//   // This method should only be called if there is a non-NULL buffer
+//   // that is full.
+//   assert(index() == 0, "pre-condition");
+//   assert(_buf != NULL, "pre-condition");
 
-  filter();
+//   filter();
 
-  PrefetchQueueSet* prefetch_qset = static_cast<PrefetchQueueSet*>(qset());
-  size_t threshold = prefetch_qset->buffer_enqueue_threshold();
-  // Ensure we'll enqueue completely full buffers.
-  assert(threshold > 0, "enqueue threshold = 0");
-  // Ensure we won't enqueue empty buffers.
-  assert(threshold <= capacity(),
-         "enqueue threshold " SIZE_FORMAT " exceeds capacity " SIZE_FORMAT,
-         threshold, capacity());
-  return index() < threshold;
+//   PrefetchQueueSet* prefetch_qset = static_cast<PrefetchQueueSet*>(qset());
+//   size_t threshold = prefetch_qset->buffer_enqueue_threshold();
+//   // Ensure we'll enqueue completely full buffers.
+//   assert(threshold > 0, "enqueue threshold = 0");
+//   // Ensure we won't enqueue empty buffers.
+//   assert(threshold <= capacity(),
+//          "enqueue threshold " SIZE_FORMAT " exceeds capacity " SIZE_FORMAT,
+//          threshold, capacity());
+//   return index() < threshold;
+// }
+
+// void PrefetchQueue::apply_closure_and_empty(PrefetchBufferClosure* cl) {
+//   assert(SafepointSynchronize::is_at_safepoint(),
+//          "SATB queues must only be processed at safepoints");
+//   if (_buf != NULL) {
+//     cl->do_buffer(&_buf[index()], size());
+//     reset();
+//   }
+// }
+
+
+
+// PrefetchQueueSet::PrefetchQueueSet() :
+//   PtrQueueSet(),
+//   _shared_prefetch_queue(this, true /* permanent */),
+//   _buffer_enqueue_threshold(0)
+// {}
+
+PrefetchQueueSet::PrefetchQueueSet(BufferNode::Allocator* allocator) :
+  PtrQueueSet(allocator),
+  _list(),
+  _count_and_process_flag(0),
+  _process_completed_buffers_threshold(SIZE_MAX),
+  _buffer_enqueue_threshold(0),
+  _all_active(false)
+{}
+
+PrefetchQueueSet::~PrefetchQueueSet() {
+  abandon_completed_buffers();
 }
 
-void PrefetchQueue::apply_closure_and_empty(PrefetchBufferClosure* cl) {
-  assert(SafepointSynchronize::is_at_safepoint(),
-         "SATB queues must only be processed at safepoints");
-  if (_buf != NULL) {
-    cl->do_buffer(&_buf[index()], size());
-    reset();
+void PrefetchQueueSet::enqueue_known_active(PrefetchQueue& queue, oop obj) {
+  assert(queue.is_active(), "precondition");
+  void* value = cast_from_oop<void*>(obj);
+  if (!try_enqueue(queue, value)) {
+    handle_zero_index(queue);
+    retry_enqueue(queue, value);
   }
 }
 
-
-
-PrefetchQueueSet::PrefetchQueueSet() :
-  PtrQueueSet(),
-  _shared_prefetch_queue(this, true /* permanent */),
-  _buffer_enqueue_threshold(0)
-{}
-
-void PrefetchQueueSet::initialize(Monitor* cbl_mon,
-                                  BufferNode::Allocator* allocator/*,
-                                  size_t process_completed_buffers_threshold,
-                                  uint buffer_enqueue_threshold_percentage,
-                                  Mutex* lock*/) {
-  PtrQueueSet::initialize(cbl_mon, allocator);
-  // set_process_completed_buffers_threshold(process_completed_buffers_threshold);
-  // _shared_prefetch_queue.set_lock(lock);
-  assert(buffer_size() != 0, "buffer size not initialized");
-  // Minimum threshold of 1 ensures enqueuing of completely full buffers.
-  // size_t size = buffer_size();
-  // size_t enqueue_qty = (size * buffer_enqueue_threshold_percentage) / 100;
-  // _buffer_enqueue_threshold = MAX2(size - enqueue_qty, (size_t)1);
+void PrefetchQueueSet::handle_zero_index(PrefetchQueue& queue) {
+  assert(queue.index() == 0, "precondition");
+  if (queue.buffer() == nullptr) {
+    install_new_buffer(queue);
+  } else {
+    queue.handle_zero_index();
+    // filter(queue);
+    // if (should_enqueue_buffer(queue)) {
+    //   enqueue_completed_buffer(exchange_buffer_with_new(queue));
+    // } // Else continue to use the existing buffer.
+  }
+  assert(queue.buffer() != nullptr, "post condition");
+  assert(queue.index() > 0, "post condition");
 }
 
+// void PrefetchQueueSet::initialize(Monitor* cbl_mon,
+//                                   BufferNode::Allocator* allocator/*,
+//                                   size_t process_completed_buffers_threshold,
+//                                   uint buffer_enqueue_threshold_percentage,
+//                                   Mutex* lock*/) {
+//   PtrQueueSet::initialize(cbl_mon, allocator);
+//   // set_process_completed_buffers_threshold(process_completed_buffers_threshold);
+//   // _shared_prefetch_queue.set_lock(lock);
+//   assert(buffer_size() != 0, "buffer size not initialized");
+//   // Minimum threshold of 1 ensures enqueuing of completely full buffers.
+//   // size_t size = buffer_size();
+//   // size_t enqueue_qty = (size * buffer_enqueue_threshold_percentage) / 100;
+//   // _buffer_enqueue_threshold = MAX2(size - enqueue_qty, (size_t)1);
+// }
+
+
+// void PrefetchQueueSet::set_active_all_threads(bool active, bool expected_active) {
+//   assert(SafepointSynchronize::is_at_safepoint(), "Must be at safepoint.");
+//   _all_active = active;
+//   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
+//     prefetch_queue_for_thread(t).set_active(active);
+//   }
+//   shared_prefetch_queue()->set_active(active);
+// }
 
 void PrefetchQueueSet::set_active_all_threads(bool active, bool expected_active) {
   assert(SafepointSynchronize::is_at_safepoint(), "Must be at safepoint.");
-  _all_active = active;
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
-    prefetch_queue_for_thread(t).set_active(active);
-  }
-  shared_prefetch_queue()->set_active(active);
-}
-
-void PrefetchQueueSet::filter_thread_buffers() {
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
-    prefetch_queue_for_thread(t).filter();
-  }
-  shared_prefetch_queue()->filter();
-}
-
-bool PrefetchQueueSet::apply_closure_to_completed_buffer(PrefetchBufferClosure* cl) {
-  BufferNode* nd = NULL;
+#ifdef ASSERT
+  verify_active_states(expected_active);
+#endif // ASSERT
+  // Update the global state, synchronized with threads list management.
   {
-    MutexLockerEx x(_cbl_mon, Mutex::_no_safepoint_check_flag);
-    if (_completed_buffers_head != NULL) {
-      nd = _completed_buffers_head;
-      _completed_buffers_head = nd->next();
-      if (_completed_buffers_head == NULL) _completed_buffers_tail = NULL;
-      _n_completed_buffers--;
-      if (_n_completed_buffers == 0) _process_completed = false;
+    MutexLocker ml(NonJavaThreadsList_lock, Mutex::_no_safepoint_check_flag);
+    _all_active = active;
+  }
+
+  class SetThreadActiveClosure : public ThreadClosure {
+    PrefetchQueueSet* _qset;
+    bool _active;
+  public:
+    SetThreadActiveClosure(PrefetchQueueSet* qset, bool active) :
+      _qset(qset), _active(active) {}
+    virtual void do_thread(Thread* t) {
+      PrefetchQueue& queue = _qset->prefetch_queue_for_thread(t);
+      if (queue.buffer() != nullptr) {
+        assert(!_active || queue.index() == _qset->buffer_size(),
+               "queues should be empty when activated");
+        queue.set_index(_qset->buffer_size());
+      }
+      queue.set_active(_active);
     }
-  }
-  if (nd != NULL) {
-    void **buf = BufferNode::make_buffer_from_node(nd);
-    size_t index = nd->index();
-    size_t size = buffer_size();
-    assert(index <= size, "invariant");
-    cl->do_buffer(buf + index, size - index);
-    deallocate_buffer(nd);
-    return true;
-  } else {
-    return false;
-  }
+  } closure(this, active);
+  Threads::threads_do(&closure);
 }
+
+// void PrefetchQueueSet::filter_thread_buffers() {
+//   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
+//     prefetch_queue_for_thread(t).filter();
+//   }
+//   shared_prefetch_queue()->filter();
+// }
+
+// bool PrefetchQueueSet::apply_closure_to_completed_buffer(PrefetchBufferClosure* cl) {
+//   BufferNode* nd = NULL;
+//   {
+//     MutexLockerEx x(_cbl_mon, Mutex::_no_safepoint_check_flag);
+//     if (_completed_buffers_head != NULL) {
+//       nd = _completed_buffers_head;
+//       _completed_buffers_head = nd->next();
+//       if (_completed_buffers_head == NULL) _completed_buffers_tail = NULL;
+//       _n_completed_buffers--;
+//       if (_n_completed_buffers == 0) _process_completed = false;
+//     }
+//   }
+//   if (nd != NULL) {
+//     void **buf = BufferNode::make_buffer_from_node(nd);
+//     size_t index = nd->index();
+//     size_t size = buffer_size();
+//     assert(index <= size, "invariant");
+//     cl->do_buffer(buf + index, size - index);
+//     deallocate_buffer(nd);
+//     return true;
+//   } else {
+//     return false;
+//   }
+// }
 
 
 

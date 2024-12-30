@@ -120,21 +120,21 @@ void G1SATBMarkQueueSet::filter(SATBMarkQueue& queue) {
 
 // Haoran: modify
 
-G1PrefetchQueueSet::G1PrefetchQueueSet() : _g1h(NULL) {}
+// G1PrefetchQueueSet::G1PrefetchQueueSet() : _g1h(NULL) {}
 
-void G1PrefetchQueueSet::initialize(G1CollectedHeap* g1h,
-                                    Monitor* cbl_mon,
-                                    BufferNode::Allocator* allocator
-                                    /*size_t process_completed_buffers_threshold,
-                                    uint buffer_enqueue_threshold_percentage,
-                                    Mutex* lock*/) {
-  PrefetchQueueSet::initialize(cbl_mon,
-                               allocator/*,
-                               process_completed_buffers_threshold,
-                               buffer_enqueue_threshold_percentage,
-                               lock*/);
-  _g1h = g1h;
-}
+// void G1PrefetchQueueSet::initialize(G1CollectedHeap* g1h,
+//                                     Monitor* cbl_mon,
+//                                     BufferNode::Allocator* allocator
+//                                     /*size_t process_completed_buffers_threshold,
+//                                     uint buffer_enqueue_threshold_percentage,
+//                                     Mutex* lock*/) {
+//   PrefetchQueueSet::initialize(cbl_mon,
+//                                allocator/*,
+//                                process_completed_buffers_threshold,
+//                                buffer_enqueue_threshold_percentage,
+//                                lock*/);
+//   _g1h = g1h;
+// }
 
 void G1PrefetchQueueSet::handle_zero_index_for_thread(JavaThread* t) {
   G1ThreadLocalData::prefetch_queue(t).handle_zero_index();

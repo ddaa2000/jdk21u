@@ -32,6 +32,7 @@
 
 class Monitor;
 class Thread;
+class G1CollectedHeap;
 
 class G1SATBMarkQueueSet : public SATBMarkQueueSet {
 public:
@@ -47,11 +48,11 @@ class G1PrefetchQueueSet : public PrefetchQueueSet {
   G1CollectedHeap* _g1h;
 
 public:
-  G1PrefetchQueueSet();
+  G1PrefetchQueueSet(G1CollectedHeap* g1h, BufferNode::Allocator* allocator):PrefetchQueueSet(allocator), _g1h(g1h){}
 
-  void initialize(G1CollectedHeap* g1h,
-                  Monitor* cbl_mon,
-                  BufferNode::Allocator* allocator);
+  // void initialize(G1CollectedHeap* g1h,
+  //                 Monitor* cbl_mon,
+  //                 BufferNode::Allocator* allocator);
 
   static void handle_zero_index_for_thread(JavaThread* t);
   virtual PrefetchQueue& prefetch_queue_for_thread(JavaThread* const t) const;
