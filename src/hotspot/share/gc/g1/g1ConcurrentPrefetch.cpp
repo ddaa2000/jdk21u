@@ -88,11 +88,11 @@ G1ConcurrentPrefetch::G1ConcurrentPrefetch(G1CollectedHeap* g1h, G1ConcurrentMar
   // _mark_bitmap_2(),
   // _prev_mark_bitmap(&_mark_bitmap_1),
   // _next_mark_bitmap(&_mark_bitmap_2),
-  _heap(_g1h->reserved_region()),
+  // _heap(_g1h->reserved_region()),
   // _root_regions(_g1h->max_regions()),
   _global_mark_stack(&(cm->_global_mark_stack)),
   // _finger set in set_non_marking_state
-  _worker_id_offset(DirtyCardQueueSet::num_par_ids() + G1ConcRefinementThreads + ConcGCThreads),
+  _worker_id_offset(G1DirtyCardQueueSet::num_par_ids() + G1ConcRefinementThreads + ConcGCThreads),
   _max_num_tasks(ParallelGCThreads),
   // _num_active_tasks set in set_non_marking_state()
   // _tasks set inside the constructor
@@ -115,9 +115,9 @@ G1ConcurrentPrefetch::G1ConcurrentPrefetch(G1CollectedHeap* g1h, G1ConcurrentMar
   // _cleanup_times(),
   // _total_cleanup_time(0.0),
 
-  _accum_task_vtime(NULL),
+  _accum_task_vtime(nullptr),
 
-  _concurrent_workers(NULL),
+  _concurrent_workers(nullptr),
   _num_concurrent_workers(0),
   _max_concurrent_workers(0),
 
@@ -129,7 +129,7 @@ G1ConcurrentPrefetch::G1ConcurrentPrefetch(G1CollectedHeap* g1h, G1ConcurrentMar
 
   // Create & start ConcurrentMark thread.
   _pf_thread = new G1ConcurrentPrefetchThread(this, cm);
-  if (_pf_thread->osthread() == NULL) {
+  if (_pf_thread->osthread() == nullptr) {
     vm_shutdown_during_initialization("Could not create ConcurrentMarkThread");
   }
 
@@ -152,7 +152,7 @@ G1ConcurrentPrefetch::G1ConcurrentPrefetch(G1CollectedHeap* g1h, G1ConcurrentMar
   _num_concurrent_workers = PrefetchThreads;
   _max_concurrent_workers = _num_concurrent_workers;
 
-  _concurrent_workers = new WorkGang("G1 Pref", _max_concurrent_workers, false, true);
+  _concurrent_workers = new WorkerThreads("G1 Pref", _max_concurrent_workers);
   _concurrent_workers->initialize_workers();
 
   _tasks = NEW_C_HEAP_ARRAY(G1PFTask*, _max_num_tasks, mtGC);
@@ -163,7 +163,7 @@ G1ConcurrentPrefetch::G1ConcurrentPrefetch(G1CollectedHeap* g1h, G1ConcurrentMar
 
   for (uint i = 0; i < _max_num_tasks; ++i) {
     G1PFTaskQueue* task_queue = new G1PFTaskQueue();
-    task_queue->initialize();
+    // task_queue->initialize();
     _task_queues->register_queue(i, task_queue);
 
     _tasks[i] = new G1PFTask(i, cm, this, task_queue, _region_mark_stats, _g1h->max_regions());
@@ -183,7 +183,7 @@ void G1ConcurrentPrefetch::reset() {
   // Reset all tasks, since different phases will use different number of active
   // threads. So, it's easiest to have all of them ready.
   for (uint i = 0; i < _max_num_tasks; ++i) {
-    _tasks[i]->reset(_cm->next_mark_bitmap());
+    _tasks[i]->reset(&_cm->_mark_bitmap);
   }
 
   // uint max_regions = _g1h->max_regions();
@@ -278,7 +278,7 @@ void G1ConcurrentPrefetch::pre_initial_mark() {
   // _root_regions.reset();
 }
 
-class G1PFConcurrentPrefetchingTask : public AbstractGangTask {
+class G1PFConcurrentPrefetchingTask : public WorkerTask {
   G1ConcurrentMark*     _cm;
   G1ConcurrentPrefetch*     _pf;
 
@@ -297,7 +297,7 @@ public:
       G1PFTask* task = _pf->task(worker_id);
       task->record_start_time();
       if (!_cm->has_aborted()) {
-        do {
+        do { //hua: should we keep this while loop?
           // G1TaskQueueEntry entry;
 
           size_t index = _pf->prefetch_queue_index();
@@ -336,7 +336,7 @@ public:
             void* ptr;
             bool ret = prefetch_queue->dequeue(&ptr);
             while (ret && ptr != NULL) {
-              if(!G1CollectedHeap::heap()->is_in_g1_reserved(ptr)) break;
+              if(!G1CollectedHeap::heap()->is_in_reserved(ptr)) break;
               bool success = task->make_reference_grey((oop)(HeapWord*)ptr);
               if(success) {
                 // log_debug(prefetch)("Succesfully mark one in PFTask!");
@@ -360,7 +360,7 @@ public:
   }
 
   G1PFConcurrentPrefetchingTask(G1ConcurrentMark* cm, G1ConcurrentPrefetch* pf) :
-      AbstractGangTask("Concurrent Prefetch"), _cm(cm), _pf(pf) { }
+      WorkerTask("Concurrent Prefetch"), _cm(cm), _pf(pf) { }
 
   ~G1PFConcurrentPrefetchingTask() { }
 };
@@ -377,8 +377,8 @@ void G1ConcurrentPrefetch::mark_from_stacks() {
   // Setting active workers is not guaranteed since fewer
   // worker threads may currently exist and more may not be
   // available.
-  active_workers = _concurrent_workers->update_active_workers(active_workers);
-  log_info(gc, task)("Using %u workers of %u for marking", active_workers, _concurrent_workers->total_workers());
+  active_workers = _concurrent_workers->set_active_workers(active_workers);
+  log_info(gc, task)("Using %u workers of %u for marking", active_workers, _concurrent_workers->max_workers());
 
   // Parallel task terminator is set in "set_concurrency_and_phase()"
   set_concurrency_and_phase(active_workers, true /* concurrent */);
@@ -435,15 +435,15 @@ void G1PFTask::set_cm_oop_closure(G1PFOopClosure* cm_oop_closure) {
   _cm_oop_closure = cm_oop_closure;
 }
 
-void G1PFTask::reset(G1CMBitMap* next_mark_bitmap) {
-  guarantee(next_mark_bitmap != NULL, "invariant");
-  _next_mark_bitmap              = next_mark_bitmap;
+void G1PFTask::reset(G1CMBitMap* mark_bitmap) {
+  guarantee(mark_bitmap != NULL, "invariant");
+  _mark_bitmap              = mark_bitmap;
   // clear_region_fields();
 
   _calls                         = 0;
   _elapsed_time_ms               = 0.0;
-  _termination_time_ms           = 0.0;
-  _termination_start_time_ms     = 0.0;
+  // _termination_time_ms           = 0.0;
+  // _termination_start_time_ms     = 0.0;
 
   _mark_stats_cache.reset();
 }
@@ -487,6 +487,7 @@ void G1PFTask::move_entries_to_global_stack() {
 
 
 void G1PFTask::drain_local_queue(bool partially) {
+  //hua: why the has aborted check is canceled?
   // if (has_aborted()) {
   //   return;
   // }
@@ -663,7 +664,7 @@ Pair<size_t, size_t> G1PFTask::flush_mark_stats_cache() {
 void G1PFTask::do_marking_step() {
 //   assert(time_target_ms >= 1.0, "minimum granularity is 1ms");
 
-  _start_time_ms = os::elapsedVTime() * 1000.0;
+  // _start_time_ms = os::elapsedVTime() * 1000.0;
 
   // If do_stealing is true then do_marking_step will attempt to
   // steal work from the other G1CMTasks. It only makes sense to
@@ -678,13 +679,13 @@ void G1PFTask::do_marking_step() {
   // call the regular clock method
   _words_scanned = 0;
   _objs_scanned = 0;
-  _refs_reached  = 0;
+  // _refs_reached  = 0;
   // recalculate_limits();
 
   // clear all flags
   // clear_has_aborted();
-  _has_timed_out = false;
-  _draining_satb_buffers = false;
+  // _has_timed_out = false;
+  // _draining_satb_buffers = false;
 
   ++_calls;
 
@@ -962,34 +963,34 @@ G1PFTask::G1PFTask(uint worker_id,
   _g1h(G1CollectedHeap::heap()),
   _cm(cm),
   _pf(pf),
-  _next_mark_bitmap(NULL),
+  // _next_mark_bitmap(NULL),
   _task_queue(task_queue),
-  _mark_stats_cache(mark_stats, max_regions, RegionMarkStatsCacheSize),
+  _mark_stats_cache(mark_stats, G1RegionMarkStatsCache::RegionMarkStatsCacheSize),
   _calls(0),
-  _time_target_ms(0.0),
-  _start_time_ms(0.0),
+  // _time_target_ms(0.0),
+  // _start_time_ms(0.0),
   _cm_oop_closure(NULL),
-  _curr_region(NULL),
-  _finger(NULL),
-  _region_limit(NULL),
+  // _curr_region(NULL),
+  // _finger(NULL),
+  // _region_limit(NULL),
   _words_scanned(0),
   _objs_scanned(0),
-  _words_scanned_limit(0),
-  _real_words_scanned_limit(0),
-  _refs_reached(0),
-  _refs_reached_limit(0),
-  _real_refs_reached_limit(0),
-  _has_aborted(false),
-  _has_timed_out(false),
-  _draining_satb_buffers(false),
-  _step_times_ms(),
-  _elapsed_time_ms(0.0),
-  _termination_time_ms(0.0),
-  _termination_start_time_ms(0.0),
-  _marking_step_diffs_ms()
+  // _words_scanned_limit(0),
+  // _real_words_scanned_limit(0),
+  // _refs_reached(0),
+  // _refs_reached_limit(0),
+  // _real_refs_reached_limit(0),
+  // _has_aborted(false),
+  // _has_timed_out(false),
+  // _draining_satb_buffers(false),
+  // _step_times_ms(),
+  _elapsed_time_ms(0.0)
+  // _termination_time_ms(0.0)
+  // _termination_start_time_ms(0.0)
+  // _marking_step_diffs_ms()
 {
   guarantee(task_queue != NULL, "invariant");
 
-  _marking_step_diffs_ms.add(0.5);
+  // _marking_step_diffs_ms.add(0.5);
 }
 

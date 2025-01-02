@@ -43,16 +43,16 @@
 
 
 
-inline bool G1ConcurrentPrefetch::mark_in_next_bitmap(uint const worker_id, oop const obj) {
+inline bool G1ConcurrentPrefetch::mark_in_bitmap(uint const worker_id, oop const obj) {
   HeapRegion* const hr = _g1h->heap_region_containing(obj);
-  return mark_in_next_bitmap(worker_id, hr, obj);
+  return mark_in_bitmap(worker_id, hr, obj);
 }
 
-inline bool G1ConcurrentPrefetch::mark_in_next_bitmap(uint const worker_id, HeapRegion* const hr, oop const obj) {
+inline bool G1ConcurrentPrefetch::mark_in_bitmap(uint const worker_id, HeapRegion* const hr, oop const obj) {
   assert(hr != NULL, "just checking");
   assert(hr->is_in_reserved(obj), "Attempting to mark object at " PTR_FORMAT " that is not contained in the given region %u", p2i(obj), hr->hrm_index());
 
-  if (hr->obj_allocated_since_next_marking(obj)) {
+  if (hr->obj_allocated_since_marking_start(obj)) {
     return false;
   }
 
@@ -60,9 +60,9 @@ inline bool G1ConcurrentPrefetch::mark_in_next_bitmap(uint const worker_id, Heap
   // Can't assert that this is a valid object at this point, since it might be in the process of being copied by another thread.
   assert(!hr->is_continues_humongous(), "Should not try to mark object " PTR_FORMAT " in Humongous continues region %u above nTAMS " PTR_FORMAT, p2i(obj), hr->hrm_index(), p2i(hr->next_top_at_mark_start()));
 
-  HeapWord* const obj_addr = (HeapWord*)obj;
+  // HeapWord* const obj_addr = (HeapWord*)obj;
 
-  bool success = _cm->next_mark_bitmap()->par_mark(obj_addr);
+  bool success = _cm->_mark_bitmap.par_mark(obj);
   if (success) {
     add_to_liveness(worker_id, obj, obj->size());
   }
@@ -156,7 +156,7 @@ inline void G1ConcurrentPrefetch::add_to_liveness(uint worker_id, oop const obj,
 // }
 
 inline bool G1PFTask::make_reference_grey(oop obj) {
-  if (!_pf->mark_in_next_bitmap(_worker_id, obj)) {
+  if (!_pf->mark_in_bitmap(_worker_id, obj)) {
     return false;
   }
     G1TaskQueueEntry entry = G1TaskQueueEntry::from_oop(obj);
@@ -180,28 +180,28 @@ inline bool G1PFTask::make_reference_grey(oop obj) {
 
 template <class T>
 inline bool G1PFTask::deal_with_reference(T* p) {
-  increment_refs_reached();
-  oop const obj = RawAccess<MO_VOLATILE>::oop_load(p);
+  // increment_refs_reached();
+  oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
   if (obj == NULL) {
     return false;
   }
   return make_reference_grey(obj);
 }
 
-inline void G1ConcurrentPrefetch::mark_in_prev_bitmap(oop p) {
-//   assert(!_prev_mark_bitmap->is_marked((HeapWord*) p), "sanity");
-  _cm->_prev_mark_bitmap->mark((HeapWord*) p);
-}
+// inline void G1ConcurrentPrefetch::mark_in_prev_bitmap(oop p) {
+// //   assert(!_prev_mark_bitmap->is_marked((HeapWord*) p), "sanity");
+//   _cm->_prev_mark_bitmap->mark((HeapWord*) p);
+// }
 
-bool G1ConcurrentPrefetch::is_marked_in_prev_bitmap(oop p) const {
-  assert(p != NULL && oopDesc::is_oop(p), "expected an oop");
-  return _cm->prev_mark_bitmap()->is_marked((HeapWord*)p);
-}
+// bool G1ConcurrentPrefetch::is_marked_in_prev_bitmap(oop p) const {
+//   assert(p != NULL && oopDesc::is_oop(p), "expected an oop");
+//   return _cm->prev_mark_bitmap()->is_marked((HeapWord*)p);
+// }
 
-bool G1ConcurrentPrefetch::is_marked_in_next_bitmap(oop p) const {
-  assert(p != NULL && oopDesc::is_oop(p), "expected an oop");
-  return _cm->next_mark_bitmap()->is_marked((HeapWord*)p);
-}
+// bool G1ConcurrentPrefetch::is_marked_in_next_bitmap(oop p) const {
+//   assert(p != NULL && oopDesc::is_oop(p), "expected an oop");
+//   return _cm->next_mark_bitmap()->is_marked((HeapWord*)p);
+// }
 
 inline bool G1ConcurrentPrefetch::do_yield_check() {
   if (SuspendibleThreadSet::should_yield()) {

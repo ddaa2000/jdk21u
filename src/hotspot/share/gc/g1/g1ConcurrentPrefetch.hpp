@@ -121,7 +121,7 @@ class G1ConcurrentPrefetch : public CHeapObj<mtGC> {
 //   G1CMBitMap*             _next_mark_bitmap; // Under-construction mark bitmap
 
   // Heap bounds
-  MemRegion const         _heap;
+  // MemRegion const         _heap;
 
   // For grey objects
   G1CMMarkStack*           _global_mark_stack; // Grey objects behind global finger
@@ -204,7 +204,6 @@ private:
 
   // Resets the global marking data structures, as well as the
   // task local ones; should be called during initial mark.
-  void reset();
 
   // Resets all the marking data structures. Called when we have to restart
   // marking or when marking completes (via set_non_marking_state below).
@@ -283,6 +282,8 @@ private:
   // set phase at all.
   // HeapWord* volatile* _top_at_rebuild_starts;
 public:
+
+  void reset();
 
   size_t prefetch_queue_index() { 
     _current_queue_index ++;
@@ -389,9 +390,9 @@ public:
   // void cleanup();
   // Mark in the previous bitmap. Caution: the prev bitmap is usually read-only, so use
   // this carefully.
-  inline void mark_in_prev_bitmap(oop p);
+  // inline void mark_in_prev_bitmap(oop p);
 
-  inline bool is_marked_in_prev_bitmap(oop p) const;
+  // inline bool is_marked_in_prev_bitmap(oop p) const;
 
 
   inline bool do_yield_check();
@@ -406,10 +407,10 @@ public:
 //   void print_on_error(outputStream* st) const;
 
   // Mark the given object on the next bitmap if it is below nTAMS.
-  inline bool mark_in_next_bitmap(uint worker_id, HeapRegion* const hr, oop const obj);
-  inline bool mark_in_next_bitmap(uint worker_id, oop const obj);
+  inline bool mark_in_bitmap(uint worker_id, HeapRegion* const hr, oop const obj);
+  inline bool mark_in_bitmap(uint worker_id, oop const obj);
 
-  inline bool is_marked_in_next_bitmap(oop p) const;
+  // inline bool is_marked_in_next_bitmap(oop p) const;
 
 //   // Returns true if initialization was successfully completed.
 //   bool completed_initialization() const {
@@ -449,28 +450,28 @@ private:
   G1CollectedHeap*            _g1h;
   G1ConcurrentMark*           _cm;
   G1ConcurrentPrefetch*       _pf;
-  G1CMBitMap*                 _next_mark_bitmap;
+  G1CMBitMap*                 _mark_bitmap; //hua: modify
   // the task queue of this task
   G1PFTaskQueue*              _task_queue;
 
-  G1RegionMarkStatsCache      _mark_stats_cache;
+  G1RegionMarkStatsCache      _mark_stats_cache; //hua: is this synced with cm?
   // Number of calls to this task
   uint                        _calls;
 
   // When the virtual timer reaches this time, the marking step should exit
-  double                      _time_target_ms;
+  // double                      _time_target_ms;
   // Start time of the current marking step
-  double                      _start_time_ms;
+  // double                      _start_time_ms;
 
   // Oop closure used for iterations over oops
   G1PFOopClosure*             _cm_oop_closure;
 
   // Region this task is scanning, NULL if we're not scanning any
-  HeapRegion*                 _curr_region;
+  // HeapRegion*                 _curr_region;
   // Local finger of this task, NULL if we're not scanning a region
-  HeapWord*                   _finger;
+  // HeapWord*                   _finger;
   // Limit of the region this task is scanning, NULL if we're not scanning one
-  HeapWord*                   _region_limit;
+  // HeapWord*                   _region_limit;
 
   // Number of words this task has scanned
   size_t                      _words_scanned;
@@ -479,41 +480,41 @@ private:
   // called. Notice that this might be decreased under certain
   // circumstances (i.e. when we believe that we did an expensive
   // operation).
-  size_t                      _words_scanned_limit;
+  // size_t                      _words_scanned_limit;
   // Initial value of _words_scanned_limit (i.e. what it was
   // before it was decreased).
-  size_t                      _real_words_scanned_limit;
+  // size_t                      _real_words_scanned_limit;
 
   // Number of references this task has visited
-  size_t                      _refs_reached;
+  // size_t                      _refs_reached;
   // When _refs_reached reaches this limit, the regular clock is
   // called. Notice this this might be decreased under certain
   // circumstances (i.e. when we believe that we did an expensive
   // operation).
-  size_t                      _refs_reached_limit;
+  // size_t                      _refs_reached_limit;
   // Initial value of _refs_reached_limit (i.e. what it was before
   // it was decreased).
-  size_t                      _real_refs_reached_limit;
+  // size_t                      _real_refs_reached_limit;
 
   // If true, then the task has aborted for some reason
-  bool                        _has_aborted;
+  // bool                        _has_aborted;
   // Set when the task aborts because it has met its time quota
-  bool                        _has_timed_out;
+  // bool                        _has_timed_out;
   // True when we're draining SATB buffers; this avoids the task
   // aborting due to SATB buffers being available (as we're already
   // dealing with them)
-  bool                        _draining_satb_buffers;
+  // bool                        _draining_satb_buffers;
 
   // Number sequence of past step times
-  NumberSeq                   _step_times_ms;
+  // NumberSeq                   _step_times_ms;
   // Elapsed time of this task
   double                      _elapsed_time_ms;
   // Termination time of this task
-  double                      _termination_time_ms;
+  // double                      _termination_time_ms;
   // When this task got into the termination protocol
-  double                      _termination_start_time_ms;
+  // double                      _termination_start_time_ms;
 
-  TruncatedSeq                _marking_step_diffs_ms;
+  // TruncatedSeq                _marking_step_diffs_ms;
 
 //   // Updates the local fields after this task has claimed
 //   // a new region to scan
@@ -556,7 +557,7 @@ public:
   // scanned.
   inline size_t scan_objArray(objArrayOop obj, MemRegion mr);
   // Resets the task; should be called right at the beginning of a marking phase.
-  void reset(G1CMBitMap* next_mark_bitmap);
+  void reset(G1CMBitMap* mark_bitmap);
   // // Clears all the fields that correspond to a claimed region.
   // void clear_region_fields();
 
@@ -596,7 +597,7 @@ public:
   void set_cm_oop_closure(G1PFOopClosure* cm_oop_closure);
 
   // Increment the number of references this task has visited.
-  void increment_refs_reached() { ++_refs_reached; }
+  // void increment_refs_reached() { ++_refs_reached; }
 
   // Grey the object by marking it.  If not already marked, push it on
   // the local queue if below the finger. obj is required to be below its region's NTAMS.

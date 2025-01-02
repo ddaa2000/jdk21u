@@ -54,8 +54,8 @@ public:
   //                 Monitor* cbl_mon,
   //                 BufferNode::Allocator* allocator);
 
-  static void handle_zero_index_for_thread(JavaThread* t);
-  virtual PrefetchQueue& prefetch_queue_for_thread(JavaThread* const t) const;
+  static void handle_zero_index_for_thread(Thread* t);
+  virtual PrefetchQueue& prefetch_queue_for_thread(Thread* const t) const;
   virtual void filter(PrefetchQueue* queue);
 };
 

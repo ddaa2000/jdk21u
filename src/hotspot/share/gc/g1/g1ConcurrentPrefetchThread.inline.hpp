@@ -38,4 +38,29 @@
 //   return _vtime_mark_accum + _pf->all_task_accum_vtime();
 // }
 
+inline void G1ConcurrentPrefetchThread::start_full_mark() {
+  assert(_state == Idle, "cycle in progress");
+  _state = FullMark;
+}
+
+inline void G1ConcurrentPrefetchThread::start_undo_mark() {
+  assert(_state == Idle, "cycle in progress");
+  _state = UndoMark;
+}
+
+inline bool G1ConcurrentPrefetchThread::idle() const { return _state == Idle; }
+
+inline bool G1ConcurrentPrefetchThread::in_progress() const {
+  return !idle();
+}
+
+inline bool G1ConcurrentPrefetchThread::in_undo_mark() const {
+  return _state == UndoMark;
+}
+
+inline void G1ConcurrentPrefetchThread::set_idle() {
+  assert(_state == FullMark || _state == UndoMark, "must not be starting a new cycle");
+  _state = Idle;
+}
+
 #endif // SHARE_VM_GC_G1_G1CONCURRENTMARKTHREAD_INLINE_HPP

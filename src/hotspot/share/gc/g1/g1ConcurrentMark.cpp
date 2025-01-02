@@ -727,13 +727,14 @@ class G1PreConcurrentStartTask : public G1BatchedTask {
   class NoteStartOfMarkTask;
 
 public:
-  G1PreConcurrentStartTask(GCCause::Cause cause, G1ConcurrentMark* cm);
+  G1PreConcurrentStartTask(GCCause::Cause cause, G1ConcurrentMark* cm, G1ConcurrentPrefetch* pf);
 };
 
 class G1PreConcurrentStartTask::ResetMarkingStateTask : public G1AbstractSubTask {
   G1ConcurrentMark* _cm;
+  G1ConcurrentPrefetch* _pf;
 public:
-  ResetMarkingStateTask(G1ConcurrentMark* cm) : G1AbstractSubTask(G1GCPhaseTimes::ResetMarkingState), _cm(cm) { }
+  ResetMarkingStateTask(G1ConcurrentMark* cm, G1ConcurrentPrefetch *pf) : G1AbstractSubTask(G1GCPhaseTimes::ResetMarkingState), _cm(cm), _pf(pf) { }
 
   double worker_cost() const override { return 1.0; }
   void do_work(uint worker_id) override;
@@ -778,9 +779,9 @@ void G1PreConcurrentStartTask::NoteStartOfMarkTask::set_max_workers(uint max_wor
   _claimer.set_n_workers(max_workers);
 }
 
-G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1ConcurrentMark* cm) :
+G1PreConcurrentStartTask::G1PreConcurrentStartTask(GCCause::Cause cause, G1ConcurrentMark* cm, G1ConcurrentPrefetch* pf) :
   G1BatchedTask("Pre Concurrent Start", G1CollectedHeap::heap()->phase_times()) {
-  add_serial_task(new ResetMarkingStateTask(cm));
+  add_serial_task(new ResetMarkingStateTask(cm, pf));
   add_parallel_task(new NoteStartOfMarkTask());
 };
 
@@ -791,7 +792,7 @@ void G1ConcurrentMark::pre_concurrent_start(GCCause::Cause cause) {
 
   ClassLoaderDataGraph::verify_claimed_marks_cleared(ClassLoaderData::_claim_strong);
 
-  G1PreConcurrentStartTask cl(cause, this);
+  G1PreConcurrentStartTask cl(cause, this, G1CollectedHeap::heap()->concurrent_prefetch());
   G1CollectedHeap::heap()->run_batch_task(&cl);
 
   _gc_tracer_cm->set_gc_cause(cause);
@@ -1060,7 +1061,7 @@ void G1ConcurrentMark::mark_from_roots() {
   set_concurrency_and_phase(active_workers, true /* concurrent */);
 
   {
-    MutexLockerEx pl(CPF_lock, Mutex::_no_safepoint_check_flag);
+    MutexLocker pl(CPF_lock, Mutex::_no_safepoint_check_flag);
     // Haoran: modify
     CPF_lock->notify();
   }
@@ -2123,7 +2124,7 @@ G1CMOopClosure::G1CMOopClosure(G1CollectedHeap* g1h,
 // Haoran: modify
 G1PFOopClosure::G1PFOopClosure(G1CollectedHeap* g1h,
                                G1PFTask* task)
-  : MetadataVisitingOopIterateClosure(get_cm_oop_closure_ref_processor(g1h)),
+  : ClaimMetadataVisitingOopIterateClosure(ClassLoaderData::_claim_strong, get_cm_oop_closure_ref_processor(g1h)),
     _g1h(g1h), _task(task)
 { }
 
@@ -2366,7 +2367,12 @@ void G1CMTask::drain_local_queue(bool partially) {
   if (_task_queue->size() > target_size) {
     G1TaskQueueEntry entry;
     // bool ret = _task_queue->pop_local(entry);
-    bool ret = _task_queue->pop_global(entry);
+    PopResult pop_result = _task_queue->pop_global(entry);
+    while(pop_result == PopResult::Contended){
+      pop_result = _task_queue->pop_global(entry);
+    }
+    bool ret = pop_result == PopResult::Success ? true : false; 
+    // PopResult ret = _task_queue->pop_global(entry);
     while (ret) {
       oop obj = entry.obj();
       oop mask_obj = (oop)((size_t)obj & ((1ULL<<63)-1));
@@ -2384,7 +2390,11 @@ void G1CMTask::drain_local_queue(bool partially) {
         ret = false;
       } else {
         // ret = _task_queue->pop_local(entry);
-        ret = _task_queue->pop_global(entry);
+        pop_result = _task_queue->pop_global(entry);
+        while(pop_result == PopResult::Contended){
+          pop_result = _task_queue->pop_global(entry);
+        }
+        ret = pop_result == PopResult::Success ? true : false; 
       }   
     }
   }

@@ -437,6 +437,8 @@ void G1BarrierSetAssembler::gen_post_barrier_stub(LIR_Assembler* ce, G1PostBarri
   __ cmpptr(new_val_reg, NULL_WORD);
   __ jcc(Assembler::equal, *stub->continuation());
   ce->store_parameter(stub->addr()->as_pointer_register(), 0);
+  // Haoran: modify
+  ce->store_parameter(new_val_reg, 1);
   __ call(RuntimeAddress(bs->post_barrier_c1_runtime_code_blob()->code_begin()));
   __ jmp(*stub->continuation());
 }
@@ -524,6 +526,52 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
 
   const Register thread = NOT_LP64(rax) LP64_ONLY(r15_thread);
 
+  Address prefetch_queue_active(thread, in_bytes(G1ThreadLocalData::prefetch_queue_active_offset()));
+  Address prefetch_queue_index(thread, in_bytes(G1ThreadLocalData::prefetch_queue_index_offset()));
+  Address prefetch_buffer(thread, in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset()));
+
+
+  //Haoran:modify
+  __ push(rax);
+  const Register new_val = rax;
+  __ load_parameter(1, new_val);
+  Label prefetch_done;
+  Label prefetch_runtime;
+
+  __ push(rcx);
+  const Register tmp2 = rcx;
+
+  if (in_bytes(PrefetchQueue::byte_width_of_active()) == 4) {
+    __ cmpl(prefetch_queue_active, 0);
+  } else {
+    assert(in_bytes(PrefetchQueue::byte_width_of_active()) == 1, "Assumption");
+    __ cmpb(prefetch_queue_active, 0);
+  }
+  __ jcc(Assembler::equal, prefetch_done);
+
+  __ movptr(tmp2, prefetch_queue_index);
+  __ testptr(tmp2, tmp2);
+  __ jcc(Assembler::zero, prefetch_runtime);
+  __ subptr(tmp2, wordSize);
+  __ movptr(prefetch_queue_index, tmp2);
+  __ addptr(tmp2, prefetch_buffer);
+  __ movptr(Address(tmp2, 0), new_val);
+
+  __ jmp(prefetch_done);
+  __ bind(prefetch_runtime);
+  __ save_live_registers_no_oop_map(true);
+  __ load_parameter(1, rcx);
+  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
+  __ restore_live_registers(true);
+  __ bind(prefetch_done);
+
+  __ movptr(tmp2, Address(new_val,0));
+  __ pop(rcx);
+  __ pop(rax);
+
+// ----------------------------------------prefetch done -------------------------
+
+
   Address queue_index(thread, in_bytes(G1ThreadLocalData::dirty_card_queue_index_offset()));
   Address buffer(thread, in_bytes(G1ThreadLocalData::dirty_card_queue_buffer_offset()));
 
@@ -533,7 +581,24 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
   const Register cardtable = rax;
   const Register card_addr = rcx;
 
+  // Haoran: modify
+  __ push(rbx);
+  const Register val = rbx;
+  __ load_parameter(1, val);
+  // -----------------------
+
+
   __ load_parameter(0, card_addr);
+
+
+  // Haoran: modify
+  __ xorptr(val, card_addr);
+  __ shrptr(val, HeapRegion::LogOfHRGrainBytes);
+  __ testptr(val, val);
+  __ jcc(Assembler::zero, done);
+  // --------------------------------------
+
+
   __ shrptr(card_addr, CardTable::card_shift());
   // Do not use ExternalAddress to load 'byte_map_base', since 'byte_map_base' is NOT
   // a valid address and therefore is not properly handled by the relocation code.
@@ -577,6 +642,10 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
   __ pop(rdx);
 
   __ bind(done);
+  // Haoran: modify
+  __ pop(rbx);
+  // ----------------------
+
   __ pop(rcx);
   __ pop(rax);
 

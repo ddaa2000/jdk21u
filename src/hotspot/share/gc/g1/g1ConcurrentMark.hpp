@@ -88,6 +88,8 @@ public:
 
 typedef GenericTaskQueue<G1TaskQueueEntry, mtGC> G1CMTaskQueue;
 typedef GenericTaskQueueSet<G1CMTaskQueue, mtGC> G1CMTaskQueueSet;
+typedef GenericTaskQueue<G1TaskQueueEntry, mtGC>::PopResult PopResult;
+
 
 // Closure used by CM during concurrent reference discovery
 // and reference processing (during remarking) to determine

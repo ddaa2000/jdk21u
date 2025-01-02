@@ -1274,8 +1274,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _card_set_config(),
   _card_set_freelist_pool(G1CardSetConfiguration::num_mem_object_types()),
   // _prefetch_mark_queue_buffer_allocator(G1PrefetchBufferSize, PREFETCH_Q_FL_lock),
-  _prefetch_mark_queue_buffer_allocator("Prefetch Queue Allocator"),
-  _prefetch_queue_set(&_prefetch_mark_queue_buffer_allocator), /*Haoran: modify*/
+  _prefetch_mark_queue_buffer_allocator("Prefetch Queue Allocator", G1PrefetchBufferSize),
+  _prefetch_queue_set(this, &_prefetch_mark_queue_buffer_allocator), /*Haoran: modify*/
   _cm(nullptr),
   _cm_thread(nullptr),
   _cr(nullptr),
@@ -1395,32 +1395,32 @@ jint G1CollectedHeap::initialize() {
 
 
   // MemLiner heap
-  ReservedSpace heap_rs;
+  ReservedHeapSpace heap_rs;
 
   if (MemLinerEnableMemPool) {
     // Allocate the MemLiner heap at a fixed virtual address
 
     // max_byte_size is also controlled by -Xmx at CPU server now.
-    heap_rs = Universe::reserve_memliner_memory_pool(max_byte_size, heap_alignment);
+    heap_rs = Universe::reserve_memliner_memory_pool(reserved_byte_size, HeapAlignment);
     
-    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, max_byte_size/4096 + 1024, PROT_NONE, MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
+    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, reserved_byte_size/4096 + 1024, PROT_NONE, MAP_PRIVATE | MAP_NORESERVE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
     if (user_buf == MAP_FAILED) {
       tty->print("Reserve user_buffer, 0x%lx failed. \n",
         0x100000000000UL);
     } else {
       tty->print("Reserve user_buffer: 0x%lx, bytes_len: 0x%lx \n",
-        (unsigned long)user_buf, max_byte_size/4096 + 1024);
+        (unsigned long)user_buf, reserved_byte_size/4096 + 1024);
     }
-    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, max_byte_size/4096 + 1024, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
+    user_buf = (struct epoch_struct*)mmap((char*)0x100000000000UL, reserved_byte_size/4096 + 1024, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0);
     if (user_buf == MAP_FAILED) {
       tty->print("Commit user_buffer, 0x%lx failed. \n", 0x100000000000UL);
     } else {
       tty->print("Commit user_buffer: 0x%lx, bytes_len: 0x%lx \n",
-        (unsigned long)user_buf, max_byte_size/4096 + 1024);
+        (unsigned long)user_buf, reserved_byte_size/4096 + 1024);
     }
 
     // #2 Ask kernel to fill the physical pages of the buffer
-    int ret = syscall(457, (unsigned long)user_buf, max_byte_size/4096 + 512);
+    int ret = syscall(457, (unsigned long)user_buf, reserved_byte_size/4096 + 512);
     if (ret) {
       tty->print("syscall error, with code %d\n", ret);
     }
@@ -1443,7 +1443,7 @@ jint G1CollectedHeap::initialize() {
     // If this happens then we could end up using a non-optimal
     // compressed oops mode.
 
-    heap_rs = Universe::reserve_heap(max_byte_size, heap_alignment);
+    heap_rs = Universe::reserve_heap(reserved_byte_size, HeapAlignment);
   }
 
   initialize_reserved_region(heap_rs);
@@ -1463,7 +1463,7 @@ jint G1CollectedHeap::initialize() {
   }
 
   // Haoran: modify
-  prefetch_queue_set().initialize(this, PREFETCH_Q_CBL_mon, &_prefetch_mark_queue_buffer_allocator);
+  // prefetch_queue_set().initialize(this, PREFETCH_Q_CBL_mon, &_prefetch_mark_queue_buffer_allocator);
 
 
   // Create space mappers.
@@ -1821,36 +1821,36 @@ void G1CollectedHeap::increment_old_marking_cycles_completed(bool concurrent,
  */
 void G1CollectedHeap::prefetch_enque(JavaThread* jthread, oop obj1, oop obj2, oop obj3, oop obj4, oop obj5, int num_of_valid_param ){
 
-  //
-  // Put the obj# into corresponding JavaThread's prefetch queue.
-  // As shown below.
+//   //
+//   // Put the obj# into corresponding JavaThread's prefetch queue.
+//   // As shown below.
 
-  //debug fucntion, get a useless queue.
-  if(!_cm->concurrent()) return;
-  PrefetchQueue & tmp_queue = G1ThreadLocalData::prefetch_queue(jthread);
-  if(obj1!=NULL)
-    tmp_queue.enqueue((void*)(HeapWord*)obj1);
-  if(obj2!=NULL)
-    tmp_queue.enqueue((void*)(HeapWord*)obj2);
-  if(obj3!=NULL)
-    tmp_queue.enqueue((void*)(HeapWord*)obj3);
-  if(obj4!=NULL)
-    tmp_queue.enqueue((void*)(HeapWord*)obj4);
-  if(obj5!=NULL)
-    tmp_queue.enqueue((void*)(HeapWord*)obj5);
-  void* tmp_obj = NULL;
-  tmp_queue.enqueue(tmp_obj);
+//   //debug fucntion, get a useless queue.
+//   if(!_cm->concurrent()) return;
+//   PrefetchQueue & tmp_queue = G1ThreadLocalData::prefetch_queue(jthread);
+//   if(obj1!=NULL)
+//     tmp_queue.enqueue((void*)(HeapWord*)obj1);
+//   if(obj2!=NULL)
+//     tmp_queue.enqueue((void*)(HeapWord*)obj2);
+//   if(obj3!=NULL)
+//     tmp_queue.enqueue((void*)(HeapWord*)obj3);
+//   if(obj4!=NULL)
+//     tmp_queue.enqueue((void*)(HeapWord*)obj4);
+//   if(obj5!=NULL)
+//     tmp_queue.enqueue((void*)(HeapWord*)obj5);
+//   void* tmp_obj = NULL;
+//   tmp_queue.enqueue(tmp_obj);
 
-//   dirty_card_queue(jthread);
-  // log_debug(prefetch)("%s, JavaThread: 0x%lx \n", __func__, (size_t)jthread);
-//   log_debug(prefetch)("    prarameter obj1 0x%lx\n", (size_t)obj1 );
-//   log_debug(prefetch)("    prarameter obj2 0x%lx\n", (size_t)obj2 );
-//   log_debug(prefetch)("    prarameter obj3 0x%lx\n", (size_t)obj3 );
-//   log_debug(prefetch)("    prarameter obj4 0x%lx\n", (size_t)obj4 );
-//   log_debug(prefetch)("    prarameter obj5 0x%lx\n", (size_t)obj5 );
-//   log_debug(prefetch)("    number of valid prarameters %d\n", num_of_valid_param );
+// //   dirty_card_queue(jthread);
+//   // log_debug(prefetch)("%s, JavaThread: 0x%lx \n", __func__, (size_t)jthread);
+// //   log_debug(prefetch)("    prarameter obj1 0x%lx\n", (size_t)obj1 );
+// //   log_debug(prefetch)("    prarameter obj2 0x%lx\n", (size_t)obj2 );
+// //   log_debug(prefetch)("    prarameter obj3 0x%lx\n", (size_t)obj3 );
+// //   log_debug(prefetch)("    prarameter obj4 0x%lx\n", (size_t)obj4 );
+// //   log_debug(prefetch)("    prarameter obj5 0x%lx\n", (size_t)obj5 );
+// //   log_debug(prefetch)("    number of valid prarameters %d\n", num_of_valid_param );
 
-   // log_debug(prefetch)("%s, get the thread local dirty card queue 0x%lx \n", __func__, (size_t)(&tmp_queue) );
+//    // log_debug(prefetch)("%s, get the thread local dirty card queue 0x%lx \n", __func__, (size_t)(&tmp_queue) );
 
 }
 
@@ -2524,10 +2524,11 @@ void G1CollectedHeap::start_concurrent_cycle(bool concurrent_operation_is_full_m
     _cm->post_concurrent_mark_start();
     _cm_thread->start_full_mark();
     // Haoran: modify
-    _pf_thread->set_started(); //hua: todo modify
+    _pf_thread->start_full_mark(); //hua: todo modify
   } else {
     _cm->post_concurrent_undo_start();
     _cm_thread->start_undo_mark();
+    _pf_thread->start_undo_mark(); //hua: todo modify
     //hua: todo start undo mark?
 
   }

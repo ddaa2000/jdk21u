@@ -34,6 +34,7 @@
 #include "runtime/thread.hpp"
 #include "runtime/threadSMR.hpp"
 #include "runtime/vmThread.hpp"
+#include "runtime/threads.hpp"
 
 PrefetchQueue::PrefetchQueue(PrefetchQueueSet* qset, bool permanent) :
   // SATB queues are only active during marking cycles. We create
@@ -42,10 +43,12 @@ PrefetchQueue::PrefetchQueue(PrefetchQueueSet* qset, bool permanent) :
   // before the thread starts running, we'll need to set its active
   // field to true. This must be done in the collector-specific
   // BarrierSet::on_thread_attach() implementation.
-  PtrQueue(qset, permanent, false /* active */),
-  _m(Mutex::leaf, FormatBuffer<128>("PrefetchQueue"), true, Monitor::_safepoint_check_never),
-  _qset(qset),
-  _in_processing(false)
+  // PtrQueue(qset, permanent, false /* active */),
+  PtrQueue(qset),
+  // _m(Mutex::leaf, FormatBuffer<128>("PrefetchQueue"), true, Monitor::_safepoint_check_never),
+  _m(Mutex::nosafepoint, "PrefetchQueue", true),
+  _in_processing(false),
+  _qset(qset)
 { }
 
 PrefetchQueue::~PrefetchQueue() {
@@ -231,31 +234,57 @@ void PrefetchQueueSet::set_active_all_threads(bool active, bool expected_active)
 //   }
 // }
 
-
-
 void PrefetchQueueSet::abandon_partial_marking() {
-  BufferNode* buffers_to_delete = NULL;
-  {
-    MutexLockerEx x(_cbl_mon, Mutex::_no_safepoint_check_flag);
-    while (_completed_buffers_head != NULL) {
-      BufferNode* nd = _completed_buffers_head;
-      _completed_buffers_head = nd->next();
-      nd->set_next(buffers_to_delete);
-      buffers_to_delete = nd;
-    }
-    _completed_buffers_tail = NULL;
-    _n_completed_buffers = 0;
-    DEBUG_ONLY(assert_completed_buffer_list_len_correct_locked());
-  }
-  while (buffers_to_delete != NULL) {
-    BufferNode* nd = buffers_to_delete;
-    buffers_to_delete = nd->next();
-    deallocate_buffer(nd);
-  }
   assert(SafepointSynchronize::is_at_safepoint(), "Must be at safepoint.");
-  // So we can safely manipulate these queues.
-  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
-    prefetch_queue_for_thread(t).reset();
-  }
-  shared_prefetch_queue()->reset();
+  abandon_completed_buffers();
+
+  class AbandonThreadQueueClosure : public ThreadClosure {
+    PrefetchQueueSet& _qset;
+  public:
+    AbandonThreadQueueClosure(PrefetchQueueSet& qset) : _qset(qset) {}
+    virtual void do_thread(Thread* t) {
+      _qset.reset_queue(_qset.prefetch_queue_for_thread(t));
+    }
+  } closure(*this);
+  Threads::threads_do(&closure);
 }
+
+void PrefetchQueueSet::abandon_completed_buffers() {
+  Atomic::store(&_count_and_process_flag, size_t(0));
+  BufferNode* buffers_to_delete = _list.pop_all();
+  while (buffers_to_delete != nullptr) {
+    BufferNode* bn = buffers_to_delete;
+    buffers_to_delete = bn->next();
+    bn->set_next(nullptr);
+    deallocate_buffer(bn);
+  }
+}
+
+
+
+// void PrefetchQueueSet::abandon_partial_marking() {
+//   BufferNode* buffers_to_delete = NULL;
+//   {
+//     MutexLockerEx x(_cbl_mon, Mutex::_no_safepoint_check_flag);
+//     while (_completed_buffers_head != NULL) {
+//       BufferNode* nd = _completed_buffers_head;
+//       _completed_buffers_head = nd->next();
+//       nd->set_next(buffers_to_delete);
+//       buffers_to_delete = nd;
+//     }
+//     _completed_buffers_tail = NULL;
+//     _n_completed_buffers = 0;
+//     DEBUG_ONLY(assert_completed_buffer_list_len_correct_locked());
+//   }
+//   while (buffers_to_delete != NULL) {
+//     BufferNode* nd = buffers_to_delete;
+//     buffers_to_delete = nd->next();
+//     deallocate_buffer(nd);
+//   }
+//   assert(SafepointSynchronize::is_at_safepoint(), "Must be at safepoint.");
+//   // So we can safely manipulate these queues.
+//   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *t = jtiwh.next(); ) {
+//     prefetch_queue_for_thread(t).reset();
+//   }
+//   // shared_prefetch_queue()->reset();
+// }

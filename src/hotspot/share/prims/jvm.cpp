@@ -450,6 +450,31 @@ JVM_ENTRY_NO_ENV(void, JVM_GC(void))
   }
 JVM_END
 
+//
+// Debug - prefetch support
+JVM_ENTRY_NO_ENV(void, JVM_Prefetch(jobject obj1, jobject obj2, jobject obj3, jobject obj4, jobject obj5, int num_of_valid_param))
+  // JVMWrapper("JVM_Prefetch");
+
+  assert(Thread::current()->is_Java_thread(), "This function is only invoked by Mutator Thread (Java Thread)" );
+
+  JavaThread* jthread = JavaThread::current();
+  // Pass the data into Thread->_gc_data<G1ThreadLocalData>
+  // More specifically, G1ThreadLocalData->_prefetch_queue
+
+  //debug
+  // log_debug(prefetch)("%s, obj1 0x%lx, JNIHandles::resolve(obj1): 0x%lx \n", __func__, (size_t)obj1, (size_t)cast_from_oop<intptr_t>(JNIHandles::resolve(obj1)) );
+
+  // go into each GC implementation via the Heap instance
+  // JNIHandles::resolve(jobject), transform the jobject to NULL or oop.
+  Universe::heap()->prefetch_enque(jthread, 
+                  JNIHandles::resolve(obj1), 
+                  JNIHandles::resolve(obj2), 
+                  JNIHandles::resolve(obj3), 
+                  JNIHandles::resolve(obj4), 
+                  JNIHandles::resolve(obj5), 
+                  num_of_valid_param );
+JVM_END
+
 
 JVM_LEAF(jlong, JVM_MaxObjectInspectionAge(void))
   return Universe::heap()->millis_since_last_whole_heap_examined();

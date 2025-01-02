@@ -118,6 +118,12 @@ JVM_Halt(jint code);
 JNIEXPORT void JNICALL
 JVM_GC(void);
 
+//
+// Debug - Prefetch JNI support
+JNIEXPORT void JNICALL
+JVM_Prefetch(jobject obj1, jobject obj2, jobject obj3, jobject obj4, jobject obj5, int num_of_valid_param);
+
+
 /* Returns the number of real-time milliseconds that have elapsed since the
  * least-recently-inspected heap object was last inspected by the garbage
  * collector.

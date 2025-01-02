@@ -135,7 +135,15 @@ class ReservedHeapSpace : public ReservedSpace {
   // Constructor. Tries to find a heap that is good for compressed oops.
   // heap_allocation_directory is the path to the backing memory for Java heap. When set, Java heap will be allocated
   // on the device which is managed by the file system where the directory resides.
+  ReservedHeapSpace(): ReservedSpace(){}
   ReservedHeapSpace(size_t size, size_t forced_base_alignment, size_t page_size, const char* heap_allocation_directory = nullptr);
+
+  // MemLiner
+  // Reserve Java Heap for Semeru memory pool at specific start address.
+  // The start address of Semeru memory pool is decided by CPU server.
+  ReservedHeapSpace(size_t size, size_t alignment, char* heap_start_addr = NULL);
+
+
   // Returns the base to be used for compression, i.e. so that null can be
   // encoded safely and implicit null checks can work.
   char *compressed_oop_base() const { return _base - _noaccess_prefix; }

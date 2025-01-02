@@ -136,11 +136,11 @@ void G1SATBMarkQueueSet::filter(SATBMarkQueue& queue) {
 //   _g1h = g1h;
 // }
 
-void G1PrefetchQueueSet::handle_zero_index_for_thread(JavaThread* t) {
+void G1PrefetchQueueSet::handle_zero_index_for_thread(Thread* t) {
   G1ThreadLocalData::prefetch_queue(t).handle_zero_index();
 }
 
-PrefetchQueue& G1PrefetchQueueSet::prefetch_queue_for_thread(JavaThread* const t) const{
+PrefetchQueue& G1PrefetchQueueSet::prefetch_queue_for_thread(Thread* const t) const{
   return G1ThreadLocalData::prefetch_queue(t);
 }
 
@@ -170,7 +170,7 @@ static inline bool requires_marking_prefetch(const void* entry, G1CollectedHeap*
 }
 
 static inline bool discard_entry_prefetch(const void* entry, G1CollectedHeap* g1h) {
-  return !requires_marking_prefetch(entry, g1h) || g1h->is_marked_next((oop)entry);
+  return !requires_marking_prefetch(entry, g1h) || g1h->is_marked((oop)entry);
 }
 
 // Workaround for not yet having std::bind.

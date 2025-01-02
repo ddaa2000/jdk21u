@@ -65,5 +65,9 @@ JRT_END
 // Haoran: modify
 // G1 post write barrier slowpath
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry(oopDesc* new_val, JavaThread* thread))
-  G1ThreadLocalData::prefetch_queue(thread).enqueue(new_val);
+  assert(thread == JavaThread::current(), "pre-condition");
+  assert(new_val != nullptr, "should be optimized out");
+  assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  PrefetchQueue& queue = G1ThreadLocalData::prefetch_queue(thread);
+  G1CollectedHeap::heap()->prefetch_queue_set().enqueue_known_active(queue, new_val);
 JRT_END

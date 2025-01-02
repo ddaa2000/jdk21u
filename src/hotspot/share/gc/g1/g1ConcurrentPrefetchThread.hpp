@@ -46,18 +46,37 @@ class G1ConcurrentPrefetchThread: public ConcurrentGCThread {
   G1ConcurrentMark* _cm;
 
 
-  enum State {
+  // enum State {
+  //   Idle,
+  //   Started,
+  //   InProgress
+  // };
+
+  enum ServiceState : uint {
     Idle,
-    Started,
-    InProgress
+    FullMark,
+    UndoMark
   };
 
-  volatile State _state;
+  volatile ServiceState _state;
 
-  // WhiteBox testing support.
-  ConcurrentGCPhaseManager::Stack _phase_manager_stack;
+  // // WhiteBox testing support.
+  // ConcurrentGCPhaseManager::Stack _phase_manager_stack;
 
-  void sleep_before_next_cycle();
+  bool wait_for_next_cycle();
+
+  //hua: ?? should add?
+  // bool mark_loop_needs_restart() const;
+  // void concurrent_mark_cycle_do();
+  // void concurrent_undo_cycle_do();
+
+  // void concurrent_cycle_end(bool mark_cycle_completed);
+
+  // // Delay pauses to meet MMU.
+  // void delay_to_keep_mmu(bool remark);
+  // double mmu_delay_end(G1Policy* policy, bool remark);
+  //hua: ?? should add? end
+
   // Delay marking to meet MMU.
   // void delay_to_keep_mmu(G1Policy* g1_policy, bool remark);
   // double mmu_sleep_time(G1Policy* g1_policy, bool remark);
@@ -77,13 +96,32 @@ class G1ConcurrentPrefetchThread: public ConcurrentGCThread {
   G1ConcurrentPrefetch* pf()   { return _pf; }
   G1ConcurrentMark* cm()   { return _cm; }
 
+  // Total virtual time so far for this thread and concurrent marking tasks.
+  double vtime_accum();
+  // Marking virtual time so far this thread and concurrent marking tasks.
+  double vtime_mark_accum();
 
-  void set_idle()          { assert(_state != Started, "must not be starting a new cycle"); _state = Idle; }
-  bool idle()              { return _state == Idle; }
-  void set_started()       { assert(_state == Idle, "cycle in progress"); _state = Started; }
-  bool started()           { return _state == Started; }
-  void set_in_progress()   { assert(_state == Started, "must be starting a cycle"); _state = InProgress; }
-  bool in_progress()       { return _state == InProgress; }
+  void set_idle();
+  void start_full_mark();
+  void start_undo_mark();
+
+  bool idle() const;
+  // Returns true from the moment a concurrent cycle is
+  // initiated (during the concurrent start pause when started() is set)
+  // to the moment when the cycle completes (just after the next
+  // marking bitmap has been cleared and in_progress() is
+  // cleared).
+  bool in_progress() const;
+
+  bool in_undo_mark() const;
+
+
+  // void set_idle()          { assert(_state != Started, "must not be starting a new cycle"); _state = Idle; }
+  // bool idle()              { return _state == Idle; }
+  // void set_started()       { assert(_state == Idle, "cycle in progress"); _state = Started; }
+  // bool started()           { return _state == Started; }
+  // void set_in_progress()   { assert(_state == Started, "must be starting a cycle"); _state = InProgress; }
+  // bool in_progress()       { return _state == InProgress; }
 
   // Returns true from the moment a marking cycle is
   // initiated (during the initial-mark pause when started() is set)
@@ -93,15 +131,15 @@ class G1ConcurrentPrefetchThread: public ConcurrentGCThread {
   // so that cycles do not overlap. We cannot use just in_progress()
   // as the CM thread might take some time to wake up before noticing
   // that started() is set and set in_progress().
-  bool during_cycle()      { return !idle(); }
+  // bool during_cycle()      { return !idle(); }
 
   // WhiteBox testing support.
   // const char* const* concurrent_phases() const;
   // bool request_concurrent_phase(const char* phase);
 
-  ConcurrentGCPhaseManager::Stack* phase_manager_stack() {
-    return &_phase_manager_stack;
-  }
+  // ConcurrentGCPhaseManager::Stack* phase_manager_stack() {
+  //   return &_phase_manager_stack;
+  // }
 };
 
 #endif // SHARE_VM_GC_G1_G1CONCURRENTMARKTHREAD_HPP

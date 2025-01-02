@@ -54,8 +54,7 @@ G1ConcurrentPrefetchThread::G1ConcurrentPrefetchThread(G1ConcurrentPrefetch* pf,
   _vtime_mark_accum(0.0),
   _pf(pf),
   _cm(cm),
-  _state(Idle),
-  _phase_manager_stack() {
+  _state(Idle) {
 
   set_name("G1 Main Prefetcher");
   create_and_start();
@@ -221,124 +220,170 @@ void G1ConcurrentPrefetchThread::run_service() {
   _vtime_start = os::elapsedVTime();
 
   G1CollectedHeap* g1h = G1CollectedHeap::heap();
-  G1Policy* g1_policy = g1h->g1_policy();
+  G1Policy* g1_policy = g1h->policy();
 
-  // G1ConcPhaseManager cpmanager(G1ConcurrentPhase::IDLE, this);
+  while (wait_for_next_cycle()) {
+    assert(in_progress(), "must be");
 
-  while (!should_terminate()) {
-    // wait until started is set.
-    sleep_before_next_cycle();
-
-    // double cycle_start = os::elapsedTime() * 1000;
-
-    if (should_terminate()) {
-      break;
-    }
-    // cpmanager.set_phase(G1ConcurrentPhase::CONCURRENT_CYCLE, false /* force */);
+    // if (should_terminate()) {
+    //   break;
+    // }
     {
       ResourceMark rm;
-      HandleMark   hm;
+      HandleMark   hm(Thread::current());
       double cycle_start_time = os::elapsedTime();
       double cycle_start = os::elapsedVTime();
       // It would be nice to use the G1ConcPhase class here but
       // the "end" logging is inside the loop and not at the end of
       // a scope. Also, the timer doesn't support nesting.
       // Mimicking the same log output instead.
-      {
-        // G1ConcPhaseManager mark_manager(G1ConcurrentPhase::CONCURRENT_MARK, this);
-        jlong mark_start = os::elapsed_counter();
+      if (_state == FullMark){
         while(_cm->concurrent()) {
           _pf->mark_from_stacks();
         }
-        // for (uint iter = 1; !_cm->has_aborted(); ++iter) {
-        //   // Concurrent marking.
-        //   {
-        //     G1ConcPhase p(G1ConcurrentPhase::MARK_FROM_ROOTS, this);
-        //   }
-        //   if (_cm->has_aborted()) {
-        //     break;
-        //   }
-        //   // Delay remark pause for MMU.
-        //   double mark_end_time = os::elapsedVTime();
-        //   jlong mark_end = os::elapsed_counter();
-        //   _vtime_mark_accum += (mark_end_time - cycle_start);
-        //   delay_to_keep_mmu(g1_policy, true /* remark */);
-        //   if (_cm->has_aborted()) {
-        //     break;
-        //   }
-        //   if (_cm->has_aborted()) {
-        //     break;
-        //   } else if (!_cm->restart_for_overflow()) {
-        //     break;              // Exit loop if no restart requested.
-        //   } else {
-        //     // Loop to restart for overflow.
-        //     mark_manager.set_phase(G1ConcurrentPhase::CONCURRENT_MARK, false);
-        //     // log_info(gc, marking)("%s Restart for Mark Stack Overflow (iteration #%u)",
-        //     //                       cm_title, iter);
-        //   }
-        // }
+      } else {
+        assert(_state == UndoMark, "Must do undo mark but is %d", _state);
+        //hua: todo undo cycle
       }
-    //   if (!_cm->has_aborted()) {
-    //     G1ConcPhase p(G1ConcurrentPhase::REBUILD_REMEMBERED_SETS, this);
-    //     _cm->rebuild_rem_set_concurrently();
-    //   }
+
+      {
+        // SuspendibleThreadSetJoiner sts_join(!G1UseSTWMarking); //hua: todo merge
+        SuspendibleThreadSetJoiner sts_join(); //hua: todo merge
+        set_idle();
+      }
 
       double end_time = os::elapsedVTime();
       // Update the total virtual time before doing this, since it will try
       // to measure it to get the vtime for this marking.
       _vtime_accum = (end_time - _vtime_start);
-      log_debug(prefetch)("PrefetchThread cycle %lf s", os::elapsedTime()-cycle_start_time);
-      // if (!_cm->has_aborted()) {
-      //   delay_to_keep_mmu(g1_policy, false /* cleanup */);
-      // }
-
-    //   if (!_cm->has_aborted()) {
-    //     CMCleanup cl_cl(_cm);
-    //     VM_G1Concurrent op(&cl_cl, "Pause Cleanup");
-    //     VMThread::execute(&op);
-    //   }
-
-      // We now want to allow clearing of the marking bitmap to be
-      // suspended by a collection pause.
-      // We may have aborted just before the remark. Do not bother clearing the
-      // bitmap then, as it has been done during mark abort.
-    //   if (!_cm->has_aborted()) {
-    //     G1ConcPhase p(G1ConcurrentPhase::CLEANUP_FOR_NEXT_MARK, this);
-    //     _cm->cleanup_for_next_mark();
-    //   }
+      log_info(gc)("PrefetchThread cycle %lf s", os::elapsedTime()-cycle_start_time);
     }
-    // Update the number of full collections that have been
-    // completed. This will also notify the FullGCCount_lock in case a
-    // Java thread is waiting for a full GC to happen (e.g., it
-    // called System.gc() with +ExplicitGCInvokesConcurrent).
-    {
-      SuspendibleThreadSetJoiner sts_join;
-      // g1h->increment_old_marking_cycles_completed(true /* concurrent */);
-      set_idle();
-      // _cm->concurrent_cycle_end();
-    }
-    // cpmanager.set_phase(G1ConcurrentPhase::IDLE, _cm->has_aborted() /* force */);
   }
-  // _cm->root_regions()->cancel_scan();
 }
 
+// void G1ConcurrentPrefetchThread::run_service() {
+//   _vtime_start = os::elapsedVTime();
+
+//   G1CollectedHeap* g1h = G1CollectedHeap::heap();
+//   G1Policy* g1_policy = g1h->g1_policy();
+
+//   // G1ConcPhaseManager cpmanager(G1ConcurrentPhase::IDLE, this);
+
+//   while (!should_terminate()) {
+//     // wait until started is set.
+//     sleep_before_next_cycle();
+
+//     // double cycle_start = os::elapsedTime() * 1000;
+
+//     if (should_terminate()) {
+//       break;
+//     }
+//     // cpmanager.set_phase(G1ConcurrentPhase::CONCURRENT_CYCLE, false /* force */);
+//     {
+//       ResourceMark rm;
+//       HandleMark   hm;
+//       double cycle_start_time = os::elapsedTime();
+//       double cycle_start = os::elapsedVTime();
+//       // It would be nice to use the G1ConcPhase class here but
+//       // the "end" logging is inside the loop and not at the end of
+//       // a scope. Also, the timer doesn't support nesting.
+//       // Mimicking the same log output instead.
+//       {
+//         // G1ConcPhaseManager mark_manager(G1ConcurrentPhase::CONCURRENT_MARK, this);
+//         jlong mark_start = os::elapsed_counter();
+//         while(_cm->concurrent()) {
+//           _pf->mark_from_stacks();
+//         }
+//         // for (uint iter = 1; !_cm->has_aborted(); ++iter) {
+//         //   // Concurrent marking.
+//         //   {
+//         //     G1ConcPhase p(G1ConcurrentPhase::MARK_FROM_ROOTS, this);
+//         //   }
+//         //   if (_cm->has_aborted()) {
+//         //     break;
+//         //   }
+//         //   // Delay remark pause for MMU.
+//         //   double mark_end_time = os::elapsedVTime();
+//         //   jlong mark_end = os::elapsed_counter();
+//         //   _vtime_mark_accum += (mark_end_time - cycle_start);
+//         //   delay_to_keep_mmu(g1_policy, true /* remark */);
+//         //   if (_cm->has_aborted()) {
+//         //     break;
+//         //   }
+//         //   if (_cm->has_aborted()) {
+//         //     break;
+//         //   } else if (!_cm->restart_for_overflow()) {
+//         //     break;              // Exit loop if no restart requested.
+//         //   } else {
+//         //     // Loop to restart for overflow.
+//         //     mark_manager.set_phase(G1ConcurrentPhase::CONCURRENT_MARK, false);
+//         //     // log_info(gc, marking)("%s Restart for Mark Stack Overflow (iteration #%u)",
+//         //     //                       cm_title, iter);
+//         //   }
+//         // }
+//       }
+//     //   if (!_cm->has_aborted()) {
+//     //     G1ConcPhase p(G1ConcurrentPhase::REBUILD_REMEMBERED_SETS, this);
+//     //     _cm->rebuild_rem_set_concurrently();
+//     //   }
+
+//       double end_time = os::elapsedVTime();
+//       // Update the total virtual time before doing this, since it will try
+//       // to measure it to get the vtime for this marking.
+//       _vtime_accum = (end_time - _vtime_start);
+//       log_debug(prefetch)("PrefetchThread cycle %lf s", os::elapsedTime()-cycle_start_time);
+//       // if (!_cm->has_aborted()) {
+//       //   delay_to_keep_mmu(g1_policy, false /* cleanup */);
+//       // }
+
+//     //   if (!_cm->has_aborted()) {
+//     //     CMCleanup cl_cl(_cm);
+//     //     VM_G1Concurrent op(&cl_cl, "Pause Cleanup");
+//     //     VMThread::execute(&op);
+//     //   }
+
+//       // We now want to allow clearing of the marking bitmap to be
+//       // suspended by a collection pause.
+//       // We may have aborted just before the remark. Do not bother clearing the
+//       // bitmap then, as it has been done during mark abort.
+//     //   if (!_cm->has_aborted()) {
+//     //     G1ConcPhase p(G1ConcurrentPhase::CLEANUP_FOR_NEXT_MARK, this);
+//     //     _cm->cleanup_for_next_mark();
+//     //   }
+//     }
+//     // Update the number of full collections that have been
+//     // completed. This will also notify the FullGCCount_lock in case a
+//     // Java thread is waiting for a full GC to happen (e.g., it
+//     // called System.gc() with +ExplicitGCInvokesConcurrent).
+//     {
+//       SuspendibleThreadSetJoiner sts_join;
+//       // g1h->increment_old_marking_cycles_completed(true /* concurrent */);
+//       set_idle();
+//       // _cm->concurrent_cycle_end();
+//     }
+//     // cpmanager.set_phase(G1ConcurrentPhase::IDLE, _cm->has_aborted() /* force */);
+//   }
+//   // _cm->root_regions()->cancel_scan();
+// }
+
 void G1ConcurrentPrefetchThread::stop_service() {
-  MutexLockerEx ml(CPF_lock, Mutex::_no_safepoint_check_flag);
+  //hua: todo abort logic?
+  if (in_progress()) {
+  }
+  MutexLocker ml(CPF_lock, Mutex::_no_safepoint_check_flag);
   CPF_lock->notify_all();
 }
 
 
-void G1ConcurrentPrefetchThread::sleep_before_next_cycle() {
+bool G1ConcurrentPrefetchThread::wait_for_next_cycle() {
   // We join here because we don't want to do the "shouldConcurrentMark()"
   // below while the world is otherwise stopped.
-  assert(!in_progress(), "should have been cleared");
+  // assert(!in_progress(), "should have been cleared");
 
-  MutexLockerEx x(CPF_lock, Mutex::_no_safepoint_check_flag);
-  while (!started() && !should_terminate()) {
-    CPF_lock->wait(Mutex::_no_safepoint_check_flag);
+  MonitorLocker ml(CPF_lock, Mutex::_no_safepoint_check_flag);
+  while (!in_progress() && !should_terminate()) {
+    ml.wait();
   }
 
-  if (started()) {
-    set_in_progress();
-  }
+  return !should_terminate();
 }

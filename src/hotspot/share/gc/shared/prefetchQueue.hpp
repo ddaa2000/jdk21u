@@ -28,6 +28,7 @@
 #include "gc/shared/ptrQueue.hpp"
 #include "memory/allocation.hpp"
 #include "gc/shared/gc_globals.hpp"
+#include "runtime/mutexLocker.hpp"
 
 class JavaThread;
 class PrefetchQueueSet;
@@ -60,9 +61,8 @@ private:
   template<typename Filter>
   inline void apply_filter(Filter filter_out);
 
-
-  PrefetchQueueSet* _qset; //hua: todo remove later?
   bool _active;
+  PrefetchQueueSet* _qset; //hua: todo remove later?
   
 
 public:
@@ -226,7 +226,7 @@ class PrefetchQueueSet: public PtrQueueSet {
   DEFINE_PAD_MINUS_SIZE(2, DEFAULT_CACHE_LINE_SIZE, 4 * sizeof(size_t));
 
   // BufferNode* get_completed_buffer();
-  // void abandon_completed_buffers();
+  void abandon_completed_buffers();
 
   // PrefetchQueue _shared_prefetch_queue;
   // size_t _buffer_enqueue_threshold;
@@ -255,7 +255,7 @@ protected:
   //                 Mutex* lock*/);
 
 public:
-  virtual PrefetchQueue& prefetch_queue_for_thread(JavaThread* const t) const = 0;
+  virtual PrefetchQueue& prefetch_queue_for_thread(Thread* const t) const = 0;
 
   // Apply "set_active(active)" to all SATB queues in the set. It should be
   // called only with the world stopped. The method will assert that the

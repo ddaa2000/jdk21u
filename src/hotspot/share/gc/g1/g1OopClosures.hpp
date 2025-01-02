@@ -240,7 +240,7 @@ public:
 
 // Haoran: modify
 // Closure for iterating over object fields during concurrent marking
-class G1PFOopClosure : public MetadataVisitingOopIterateClosure {
+class G1PFOopClosure : public ClaimMetadataVisitingOopIterateClosure {
   G1CollectedHeap*   _g1h;
   G1PFTask*          _task;
 public:
