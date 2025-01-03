@@ -2374,16 +2374,31 @@ void G1CMTask::drain_local_queue(bool partially) {
     bool ret = pop_result == PopResult::Success ? true : false; 
     // PopResult ret = _task_queue->pop_global(entry);
     while (ret) {
-      oop obj = entry.obj();
-      oop mask_obj = (oop)((size_t)obj & ((1ULL<<63)-1));
-      size_t page_id = ((size_t)mask_obj - SEMERU_START_ADDR)/4096;
-      if(((size_t)obj & (1ULL<<63)) || _g1h->user_buf->page_stats[page_id] == 0) {
-        G1TaskQueueEntry clean_entry = G1TaskQueueEntry::from_oop(mask_obj);
-        scan_task_entry(clean_entry);
+      //shengkai distinguish slice/obj
+      size_t addr;
+      if(entry.is_array_slice()){
+        addr = (size_t)entry.slice();
+      }else{
+        addr = (size_t)entry.obj();
       }
-      else {
-        mask_obj = (oop)((size_t)obj | (1ULL<<63));
-        G1TaskQueueEntry new_entry = G1TaskQueueEntry::from_oop(mask_obj);
+      size_t mask_addr = addr & ((1ULL<<63)-1);
+      size_t page_id = (mask_addr - SEMERU_START_ADDR)/4096;
+      if((addr & (1ULL<<63)) || _g1h->user_buf->page_stats[page_id] == 0) {
+        G1TaskQueueEntry clean_entry;
+        if(entry.is_array_slice()){
+          clean_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
+        }else{
+          clean_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+        }
+        scan_task_entry(clean_entry);
+      } else {
+        mask_addr = addr | (1ULL<<63);
+        G1TaskQueueEntry new_entry;
+        if(entry.is_array_slice()){
+          new_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
+        }else{
+          new_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+        }
         _task_queue->push(new_entry);
       }
       if (_task_queue->size() <= target_size || has_aborted()) {
@@ -2801,7 +2816,23 @@ void G1CMTask::do_marking_step(double time_target_ms,
     while (!has_aborted()) {
       G1TaskQueueEntry entry;
       if (_cm->try_stealing(_worker_id, entry)) {
-        scan_task_entry(entry);
+        //shengkai clear mask before scan
+        log_info(gc, heap)("[DEBUG] steal entry at 0x" PTR_FORMAT " addr.", p2i(entry.is_array_slice() ? entry.slice():(void*)entry.obj()));
+        size_t addr;
+        if(entry.is_array_slice()){
+          addr = (size_t)entry.slice();
+        }else{
+          addr = (size_t)entry.obj();
+        }
+        size_t mask_addr = addr & ((1ULL<<63)-1);
+        G1TaskQueueEntry clean_entry;
+        if(entry.is_array_slice()){
+          clean_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
+        }else{
+          clean_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+        }
+        scan_task_entry(clean_entry);
+
 
         // And since we're towards the end, let's totally drain the
         // local queue and global stack.
