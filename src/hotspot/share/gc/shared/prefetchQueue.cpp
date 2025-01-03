@@ -195,6 +195,7 @@ void PrefetchQueueSet::set_active_all_threads(bool active, bool expected_active)
         assert(!_active || queue.index() == _qset->buffer_size(),
                "queues should be empty when activated");
         queue.set_index(_qset->buffer_size());
+        queue.set_tail(_qset->buffer_size());
       }
       queue.set_active(_active);
     }

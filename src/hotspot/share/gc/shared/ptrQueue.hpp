@@ -100,9 +100,18 @@ public:
     return byte_index_to_index(_index);
   }
 
+  size_t tail() const {
+    return byte_index_to_index(_tail);
+  }
+
   void set_index(size_t new_index) {
     assert(new_index <= capacity(), "precondition");
     _index = index_to_byte_index(new_index);
+  }
+
+  void set_tail(size_t new_tail) {
+    assert(new_tail <= capacity(), "precondition");
+    _tail = index_to_byte_index(new_tail);
   }
 
   size_t capacity() const {

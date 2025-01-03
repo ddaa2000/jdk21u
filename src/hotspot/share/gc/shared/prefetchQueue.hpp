@@ -29,6 +29,7 @@
 #include "memory/allocation.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "runtime/mutexLocker.hpp"
+#include "logging/log.hpp"
 
 class JavaThread;
 class PrefetchQueueSet;
@@ -157,7 +158,7 @@ public:
     // holding the lock if there is one).
     if (_buf != NULL) {
       // Two-fingered compaction toward the end.
-      size_t remaining_objs = MIN2(prefetch_queue_threshold(), _tail-index());
+      size_t remaining_objs = MIN2(prefetch_queue_threshold(), tail()-index());
       void** src = &_buf[index()];
       void** dst = &_buf[index() + remaining_objs - 1];
       void** end = &_buf[capacity() - 1];
@@ -168,7 +169,7 @@ public:
       // dst points to the lowest retained entry, or the end of the buffer
       // if all the entries were filtered out.
       set_index(capacity() - remaining_objs);
-      _tail = capacity();
+      set_tail(capacity());
     }
     else {
       ShouldNotReachHere();
@@ -197,15 +198,27 @@ public:
     // }
     MutexLocker z(&_m, Mutex::_no_safepoint_check_flag);
     size_t current_index = index();
-    size_t current_tail = _tail; 
+    size_t current_tail = tail(); 
+    if (current_tail < current_index){
+      log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+      ShouldNotReachHere();
+    }
+
     if(current_tail == current_index) {
       *ptrptr = NULL;
 
       // _in_dequeue = false;
       return false;
     }
-    _tail -= 1;
+
+    if(current_tail == 0){
+      log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+      ShouldNotReachHere();
+    }
+
     *ptrptr = _buf[current_tail - 1];
+    set_tail(current_tail -  1);
+
 
 
     // _in_dequeue = false;
