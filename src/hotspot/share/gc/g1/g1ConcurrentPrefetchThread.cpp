@@ -228,23 +228,27 @@ void G1ConcurrentPrefetchThread::run_service() {
     // if (should_terminate()) {
     //   break;
     // }
+    log_info(gc)("prefetcher cycle start");
     {
       ResourceMark rm;
       HandleMark   hm(Thread::current());
       double cycle_start_time = os::elapsedTime();
       double cycle_start = os::elapsedVTime();
+      _pf->clear_has_aborted();
       // It would be nice to use the G1ConcPhase class here but
       // the "end" logging is inside the loop and not at the end of
       // a scope. Also, the timer doesn't support nesting.
       // Mimicking the same log output instead.
       if (_state == FullMark){
-        while(_cm->concurrent()) {
+        while(_cm->in_conc_mark_from_roots() && !_pf->has_aborted() && !_cm->has_aborted() && !_cm->has_overflown()) {
           _pf->mark_from_stacks();
         }
       } else {
         assert(_state == UndoMark, "Must do undo mark but is %d", _state);
         //hua: todo undo cycle
       }
+
+      log_info(gc)("prefetcher finish conc prefetching");
 
       {
         // SuspendibleThreadSetJoiner sts_join(!G1UseSTWMarking); //hua: todo merge
@@ -257,6 +261,11 @@ void G1ConcurrentPrefetchThread::run_service() {
       // to measure it to get the vtime for this marking.
       _vtime_accum = (end_time - _vtime_start);
       log_info(gc)("PrefetchThread cycle %lf s", os::elapsedTime()-cycle_start_time);
+
+      {
+        MutexLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+        CCM_finish_lock->notify();
+      }
     }
   }
 }

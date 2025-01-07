@@ -2524,11 +2524,11 @@ void G1CollectedHeap::start_concurrent_cycle(bool concurrent_operation_is_full_m
     _cm->post_concurrent_mark_start();
     _cm_thread->start_full_mark();
     // Haoran: modify
-    _pf_thread->start_full_mark(); //hua: todo modify
+    // _pf_thread->start_full_mark(); //hua: todo modify
   } else {
     _cm->post_concurrent_undo_start();
     _cm_thread->start_undo_mark();
-    _pf_thread->start_undo_mark(); //hua: todo modify
+    // _pf_thread->start_undo_mark(); //hua: todo modify
     //hua: todo start undo mark?
 
   }

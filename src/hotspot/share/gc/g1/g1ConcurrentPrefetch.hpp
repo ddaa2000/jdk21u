@@ -397,7 +397,11 @@ public:
 
   inline bool do_yield_check();
 
-//   bool has_aborted()      { return _has_aborted; }
+  bool has_aborted()      { return _has_aborted; }
+  void set_has_aborted()      { _has_aborted = true; }
+  void clear_has_aborted()      { _has_aborted = false; }
+
+
 
 //   void print_summary_info();
 
@@ -497,7 +501,7 @@ private:
   // size_t                      _real_refs_reached_limit;
 
   // If true, then the task has aborted for some reason
-  // bool                        _has_aborted;
+  bool                        _has_aborted;
   // Set when the task aborts because it has met its time quota
   // bool                        _has_timed_out;
   // True when we're draining SATB buffers; this avoids the task
@@ -590,9 +594,9 @@ public:
 
 //   HeapWord* finger()            { return _finger; }
 
-//   bool has_aborted()            { return _has_aborted; }
-//   void set_has_aborted()        { _has_aborted = true; }
-//   void clear_has_aborted()      { _has_aborted = false; }
+  bool has_aborted()            { return _has_aborted; }
+  void set_has_aborted()        { _has_aborted = true; }
+  void clear_has_aborted()      { _has_aborted = false; }
 
   void set_cm_oop_closure(G1PFOopClosure* cm_oop_closure);
 

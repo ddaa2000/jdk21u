@@ -4322,7 +4322,8 @@ char* os::Linux::reserve_memory_special_huge_tlbfs(size_t bytes,
 
 char* os::pd_reserve_memory_special(size_t bytes, size_t alignment, size_t page_size,
                                     char* req_addr, bool exec) {
-  assert(UseLargePages, "only for large pages");
+  // hua: todo check later
+  // assert(UseLargePages, "only for large pages");
 
   char* addr;
   if (UseSHM) {

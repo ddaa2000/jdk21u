@@ -352,6 +352,8 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   volatile bool           _has_overflown;
   // True: marking is concurrent, false: we're in remark
   volatile bool           _concurrent;
+  volatile bool           _in_conc_mark_from_roots;
+
   // Set at the end of a Full GC so that marking aborts
   volatile bool           _has_aborted;
 
@@ -415,8 +417,12 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   // Prints all gathered CM-related statistics
   void print_stats();
 
+  void set_in_conc_mark_from_roots(bool status) { _in_conc_mark_from_roots = status; }
+
   HeapWord*           finger()       { return _finger;   }
   bool                concurrent()   { return _concurrent; }
+  bool                in_conc_mark_from_roots()   { return _in_conc_mark_from_roots; }
+
   uint                active_tasks() { return _num_active_tasks; }
   TaskTerminator*     terminator()   { return &_terminator; }
 
@@ -454,8 +460,8 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   // Access / manipulation of the overflow flag which is set to
   // indicate that the global stack has overflown
   bool has_overflown()           { return _has_overflown; }
-  // void set_has_overflown()       { _has_overflown = true; }
-  void set_has_overflown()       {/*Haoran: modify*/ ShouldNotReachHere(); _has_overflown = true; }
+  void set_has_overflown()       { _has_overflown = true; }
+  // void set_has_overflown()       {/*Haoran: modify*/ ShouldNotReachHere(); _has_overflown = true; }
   void clear_has_overflown()     { _has_overflown = false; }
   bool restart_for_overflow()    { return _restart_for_overflow; }
 

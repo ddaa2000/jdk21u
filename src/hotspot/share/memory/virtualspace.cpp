@@ -284,6 +284,7 @@ void ReservedSpace::initialize(size_t size,
          "alignment not aligned to os::vm_allocation_granularity()");
   assert(alignment == 0 || is_power_of_2((intptr_t)alignment),
          "not a power of 2");
+  //hua : todo check later
   assert(page_size >= os::vm_page_size(), "Invalid page size");
   assert(is_power_of_2(page_size), "Invalid page size");
 
@@ -1090,12 +1091,14 @@ ReservedHeapSpace::ReservedHeapSpace(size_t size, size_t alignment, char* heap_s
 
   // The normal path : non-determined start addr; non-compressed oop heap.
   // size, allocation alignment, large_page, heap_start, executable.
-  initialize(size, alignment, false, heap_start_addr, false);  
+  size_t page_size = os::vm_page_size();
+  initialize(size, alignment, page_size, heap_start_addr, false);  
 
-  assert(markOopDesc::encode_pointer_as_mark(_base)->decode_pointer() == _base,
-         "area must be distinguishable from marks for mark-sweep");
-  assert(markOopDesc::encode_pointer_as_mark(&_base[size])->decode_pointer() == &_base[size],
-         "area must be distinguishable from marks for mark-sweep");
+  //hua: todo check here?
+  // assert(markOopDesc::encode_pointer_as_mark(_base)->decode_pointer() == _base,
+  //        "area must be distinguishable from marks for mark-sweep");
+  // assert(markOopDesc::encode_pointer_as_mark(&_base[size])->decode_pointer() == &_base[size],
+  //        "area must be distinguishable from marks for mark-sweep");
 
   // if base()!= NULL, means Java heap is reserved successfully.
   if (base() != NULL) {

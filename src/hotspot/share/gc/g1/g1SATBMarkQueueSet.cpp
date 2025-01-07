@@ -170,7 +170,7 @@ static inline bool requires_marking_prefetch(const void* entry, G1CollectedHeap*
 }
 
 static inline bool discard_entry_prefetch(const void* entry, G1CollectedHeap* g1h) {
-  return !requires_marking_prefetch(entry, g1h) || g1h->is_marked((oop)entry);
+  return !requires_marking_prefetch(entry, g1h) || g1h->is_marked(cast_to_oop(entry));
 }
 
 // Workaround for not yet having std::bind.

@@ -72,6 +72,7 @@ Mutex*   NonJavaThreadsList_lock      = nullptr;
 Mutex*   NonJavaThreadsListSync_lock  = nullptr;
 Monitor* CGC_lock                     = nullptr;
 Monitor* CPF_lock                     = nullptr; //Haoran: modify
+Monitor* CCM_finish_lock              = nullptr;
 // Mutex*   PREFETCH_Q_FL_lock           = nullptr; //Haoran: modify
 // Monitor* PREFETCH_Q_CBL_mon           = nullptr; //Haoran: modify
 Monitor* STS_lock                     = nullptr;
@@ -218,6 +219,8 @@ void mutex_init() {
   if (UseG1GC) {
     MUTEX_DEFN(CGC_lock                      , PaddedMonitor, nosafepoint);
     MUTEX_DEFN(CPF_lock                      , PaddedMonitor, nosafepoint);
+    MUTEX_DEFN(CCM_finish_lock               , PaddedMonitor, nosafepoint);
+
 
 
     MUTEX_DEFN(G1DetachedRefinementStats_lock, PaddedMutex  , nosafepoint-2);

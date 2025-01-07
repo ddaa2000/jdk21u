@@ -58,7 +58,7 @@ inline bool G1ConcurrentPrefetch::mark_in_bitmap(uint const worker_id, HeapRegio
 
   // Some callers may have stale objects to mark above nTAMS after humongous reclaim.
   // Can't assert that this is a valid object at this point, since it might be in the process of being copied by another thread.
-  assert(!hr->is_continues_humongous(), "Should not try to mark object " PTR_FORMAT " in Humongous continues region %u above nTAMS " PTR_FORMAT, p2i(obj), hr->hrm_index(), p2i(hr->next_top_at_mark_start()));
+  assert(!hr->is_continues_humongous(), "Should not try to mark object " PTR_FORMAT " in Humongous continues region %u above nTAMS " PTR_FORMAT, p2i(obj), hr->hrm_index(), p2i(hr->top_at_mark_start()));
 
   // HeapWord* const obj_addr = (HeapWord*)obj;
 
@@ -96,14 +96,31 @@ inline bool G1ConcurrentPrefetch::mark_in_bitmap(uint const worker_id, HeapRegio
 inline void G1PFTask::scan_task_entry(G1TaskQueueEntry task_entry) { process_grey_task_entry<true>(task_entry); }
 
 inline void G1PFTask::push(G1TaskQueueEntry task_entry) {
-  assert(task_entry.is_array_slice() || _g1h->is_in_g1_reserved(task_entry.obj()), "invariant");
+  // assert(task_entry.is_array_slice() || _g1h->is_in_reserved(task_entry.obj()), "invariant");
+  // assert(task_entry.is_array_slice() || !_g1h->is_on_master_free_list(
+  //             _g1h->heap_region_containing(task_entry.obj())), "invariant");
+  // assert(task_entry.is_array_slice() || !_g1h->is_obj_ill(task_entry.obj()), "invariant");  // FIXME!!!
+  // assert(task_entry.is_array_slice() || _mark_bitmap->is_marked((HeapWord*)task_entry.obj()), "invariant");
+
+  assert(task_entry.is_array_slice() || _g1h->is_in_reserved(task_entry.obj()), "invariant");
   assert(task_entry.is_array_slice() || !_g1h->is_on_master_free_list(
               _g1h->heap_region_containing(task_entry.obj())), "invariant");
-  assert(task_entry.is_array_slice() || !_g1h->is_obj_ill(task_entry.obj()), "invariant");  // FIXME!!!
-  assert(task_entry.is_array_slice() || _next_mark_bitmap->is_marked((HeapWord*)task_entry.obj()), "invariant");
+  assert(task_entry.is_array_slice() || _mark_bitmap->is_marked(cast_from_oop<HeapWord*>(task_entry.obj())), "invariant");
+
 
   if (!_task_queue->push(task_entry)) {
-    ShouldNotReachHere();
+
+    // The local task queue looks full. We need to push some entries
+    // to the global stack.
+    move_entries_to_global_stack();
+
+    // this should succeed since, even if we overflow the global
+    // stack, we should have definitely removed some entries from the
+    // local queue. So, there must be space on it.
+    bool success = _task_queue->push(task_entry);
+    assert(success, "invariant");
+
+    // ShouldNotReachHere();
   }
 }
 
@@ -112,7 +129,7 @@ inline void G1PFTask::push(G1TaskQueueEntry task_entry) {
 template<bool scan>
 inline void G1PFTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
   assert(scan || (task_entry.is_oop() && task_entry.obj()->is_typeArray()), "Skipping scan of grey non-typeArray");
-  assert(task_entry.is_array_slice() || _next_mark_bitmap->is_marked((HeapWord*)task_entry.obj()),
+  assert(task_entry.is_array_slice() || _mark_bitmap->is_marked(cast_from_oop<HeapWord*>(task_entry.obj())),
          "Any stolen object should be a slice or marked");
 
   if (scan) {
@@ -121,7 +138,7 @@ inline void G1PFTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       _objs_scanned ++;
     } else {
       oop obj = task_entry.obj();
-      obj = (oop)((size_t)obj & ((1ULL<<63)-1));
+      obj = cast_to_oop(cast_from_oop<uintptr_t>(obj) & ((((uintptr_t)1)<<63)-1));
       if (G1PFObjArrayProcessor::should_be_sliced(obj)) {
         _words_scanned += _objArray_processor.process_obj(obj);
         _objs_scanned ++;
@@ -142,7 +159,7 @@ inline size_t G1PFTask::scan_objArray(objArrayOop obj, MemRegion mr) {
 
 
 inline void G1PFTask::update_liveness(oop const obj, const size_t obj_size) {
-  _mark_stats_cache.add_live_words(_g1h->addr_to_region((HeapWord*)obj), obj_size);
+  _mark_stats_cache.add_live_words(_g1h->addr_to_region(obj), obj_size);
 }
 
 inline void G1ConcurrentPrefetch::add_to_liveness(uint worker_id, oop const obj, size_t size) {

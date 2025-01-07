@@ -268,6 +268,8 @@ protected:
   //                 Mutex* lock*/);
 
 public:
+  bool is_active() const { return _all_active; }
+  
   virtual PrefetchQueue& prefetch_queue_for_thread(Thread* const t) const = 0;
 
   // Apply "set_active(active)" to all SATB queues in the set. It should be
@@ -277,6 +279,12 @@ public:
   void set_active_all_threads(bool active, bool expected_active);
 
   size_t buffer_enqueue_threshold() const { return _buffer_enqueue_threshold; }
+
+#ifdef ASSERT
+  void dump_active_states(bool expected_active);
+  void verify_active_states(bool expected_active);
+#endif // ASSERT
+
 
   // // Filter all the currently-active SATB buffers.
   // void filter_thread_buffers();

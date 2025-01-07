@@ -150,8 +150,16 @@ void G1ConcurrentMarkThread::stop_service() {
     _cm->abort_marking_threads();
   }
 
-  MutexLocker ml(CGC_lock, Mutex::_no_safepoint_check_flag);
-  CGC_lock->notify_all();
+  {
+    MutexLocker ml(CGC_lock, Mutex::_no_safepoint_check_flag);
+    CGC_lock->notify_all();
+  }
+
+  {
+    MutexLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+    CCM_finish_lock->notify_all();
+  }
+
 }
 
 bool G1ConcurrentMarkThread::wait_for_next_cycle() {
@@ -182,9 +190,12 @@ bool G1ConcurrentMarkThread::phase_mark_loop() {
   for (uint iter = 1; true; ++iter) {
     // Subphase 1: Mark From Roots.
     if (subphase_mark_from_roots()) return true;
+    log_info(gc)("prefetcher debug finish mark from roots");
 
     // Subphase 2: Preclean (optional)
     if (G1UseReferencePrecleaning) {
+      log_info(gc)("prefetcher debug before preclean");
+
       if (subphase_preclean()) return true;
     }
 
@@ -193,6 +204,8 @@ bool G1ConcurrentMarkThread::phase_mark_loop() {
 
     // Subphase 4: Remark pause
     // [gc breakdown]
+    log_info(gc)("prefetcher debug before remark");
+
     GCMajfltStats gc_majflt_stats;
     gc_majflt_stats.start();
     if (subphase_remark()) return true;

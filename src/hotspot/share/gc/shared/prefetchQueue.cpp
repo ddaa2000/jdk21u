@@ -172,6 +172,51 @@ void PrefetchQueueSet::handle_zero_index(PrefetchQueue& queue) {
 //   shared_prefetch_queue()->set_active(active);
 // }
 
+#ifdef ASSERT
+void PrefetchQueueSet::dump_active_states(bool expected_active) {
+  log_error(gc, verify)("Expected SATB active state: %s", expected_active ? "ACTIVE" : "INACTIVE");
+  log_error(gc, verify)("Actual SATB active states:");
+  log_error(gc, verify)("  Queue set: %s", is_active() ? "ACTIVE" : "INACTIVE");
+
+  class DumpThreadStateClosure : public ThreadClosure {
+    PrefetchQueueSet* _qset;
+  public:
+    DumpThreadStateClosure(PrefetchQueueSet* qset) : _qset(qset) {}
+    virtual void do_thread(Thread* t) {
+      PrefetchQueue& queue = _qset->prefetch_queue_for_thread(t);
+      log_error(gc, verify)("  Thread \"%s\" queue: %s",
+                            t->name(),
+                            queue.is_active() ? "ACTIVE" : "INACTIVE");
+    }
+  } closure(this);
+  Threads::threads_do(&closure);
+}
+
+void PrefetchQueueSet::verify_active_states(bool expected_active) {
+  // Verify queue set state
+  if (is_active() != expected_active) {
+    dump_active_states(expected_active);
+    fatal("SATB queue set has an unexpected active state");
+  }
+
+  // Verify thread queue states
+  class VerifyThreadStatesClosure : public ThreadClosure {
+    PrefetchQueueSet* _qset;
+    bool _expected_active;
+  public:
+    VerifyThreadStatesClosure(PrefetchQueueSet* qset, bool expected_active) :
+      _qset(qset), _expected_active(expected_active) {}
+    virtual void do_thread(Thread* t) {
+      if (_qset->prefetch_queue_for_thread(t).is_active() != _expected_active) {
+        _qset->dump_active_states(_expected_active);
+        fatal("Thread SATB queue has an unexpected active state");
+      }
+    }
+  } closure(this, expected_active);
+  Threads::threads_do(&closure);
+}
+#endif // ASSERT
+
 void PrefetchQueueSet::set_active_all_threads(bool active, bool expected_active) {
   assert(SafepointSynchronize::is_at_safepoint(), "Must be at safepoint.");
 #ifdef ASSERT

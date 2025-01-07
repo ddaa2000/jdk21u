@@ -34,6 +34,8 @@
 #include "gc/g1/g1CollectorState.hpp"
 #include "gc/g1/g1ConcurrentMark.inline.hpp"
 #include "gc/g1/g1ConcurrentMarkThread.inline.hpp"
+#include "gc/g1/g1ConcurrentPrefetchThread.hpp"
+#include "gc/g1/g1ConcurrentPrefetchThread.inline.hpp"
 #include "gc/g1/g1ConcurrentRebuildAndScrub.hpp"
 #include "gc/g1/g1DirtyCardQueue.hpp"
 #include "gc/g1/g1HeapVerifier.hpp"
@@ -1059,16 +1061,29 @@ void G1ConcurrentMark::mark_from_roots() {
 
   // Parallel task terminator is set in "set_concurrency_and_phase()"
   set_concurrency_and_phase(active_workers, true /* concurrent */);
+  set_in_conc_mark_from_roots(true);
 
   {
     MutexLocker pl(CPF_lock, Mutex::_no_safepoint_check_flag);
     // Haoran: modify
+    G1CollectedHeap::heap()->_pf_thread->start_full_mark();
     CPF_lock->notify();
   }
 
   G1CMConcurrentMarkingTask marking_task(this);
   _concurrent_workers->run_task(&marking_task);
   print_stats();
+
+  set_in_conc_mark_from_roots(false);
+  {
+    log_info(gc)("before CCM mark from roots finish");
+    MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+    while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+      ml.wait();
+    }
+    log_info(gc)("after CCM mark from roots finish");
+
+  }
 }
 
 const char* G1ConcurrentMark::verify_location_string(VerifyLocation location) {
@@ -2379,7 +2394,7 @@ void G1CMTask::drain_local_queue(bool partially) {
       if(entry.is_array_slice()){
         addr = (size_t)entry.slice();
       }else{
-        addr = (size_t)entry.obj();
+        addr = cast_from_oop<size_t>(entry.obj());
       }
       size_t mask_addr = addr & ((1ULL<<63)-1);
       size_t page_id = (mask_addr - SEMERU_START_ADDR)/4096;
@@ -2388,7 +2403,7 @@ void G1CMTask::drain_local_queue(bool partially) {
         if(entry.is_array_slice()){
           clean_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
         }else{
-          clean_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+          clean_entry = G1TaskQueueEntry::from_oop(cast_to_oop(mask_addr));
         }
         scan_task_entry(clean_entry);
       } else {
@@ -2397,7 +2412,7 @@ void G1CMTask::drain_local_queue(bool partially) {
         if(entry.is_array_slice()){
           new_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
         }else{
-          new_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+          new_entry = G1TaskQueueEntry::from_oop(cast_to_oop(mask_addr));
         }
         _task_queue->push(new_entry);
       }
@@ -2805,7 +2820,7 @@ void G1CMTask::do_marking_step(double time_target_ms,
   drain_global_stack(false);
 
   // Attempt at work stealing from other task's queues.
-  if (do_stealing && !has_aborted()) {
+  if (do_stealing && !has_aborted() && false) {
     // We have not aborted. This means that we have finished all that
     // we could. Let's try to do some stealing...
 
@@ -2817,19 +2832,19 @@ void G1CMTask::do_marking_step(double time_target_ms,
       G1TaskQueueEntry entry;
       if (_cm->try_stealing(_worker_id, entry)) {
         //shengkai clear mask before scan
-        log_info(gc, heap)("[DEBUG] steal entry at 0x" PTR_FORMAT " addr.", p2i(entry.is_array_slice() ? entry.slice():(void*)entry.obj()));
+        // log_info(gc, heap)("[DEBUG] steal entry at 0x" PTR_FORMAT " addr.", p2i(entry.is_array_slice() ? entry.slice():(void*)entry.obj()));
         size_t addr;
         if(entry.is_array_slice()){
           addr = (size_t)entry.slice();
         }else{
-          addr = (size_t)entry.obj();
+          addr = cast_from_oop<size_t>(entry.obj());
         }
         size_t mask_addr = addr & ((1ULL<<63)-1);
         G1TaskQueueEntry clean_entry;
         if(entry.is_array_slice()){
           clean_entry = G1TaskQueueEntry::from_slice((HeapWord *)mask_addr);
         }else{
-          clean_entry = G1TaskQueueEntry::from_oop((oop)mask_addr);
+          clean_entry = G1TaskQueueEntry::from_oop(cast_to_oop(mask_addr));
         }
         scan_task_entry(clean_entry);
 
@@ -2912,11 +2927,26 @@ void G1CMTask::do_marking_step(double time_target_ms,
       if (!is_serial) {
         // We only need to enter the sync barrier if being called
         // from a parallel context
+        if( _worker_id == 0){
+          log_info(gc)("before CCM overflow handle");
+          MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+          while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+            ml.wait();
+          }
+          log_info(gc)("after CCM overflow handle");
+        }
         _cm->enter_first_sync_barrier(_worker_id);
 
         // When we exit this sync barrier we know that all tasks have
         // stopped doing marking work. So, it's now safe to
         // re-initialize our data structures.
+      } else {
+        log_info(gc)("before CCM overflow handle");
+        MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+        while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+          ml.wait();
+        }
+        log_info(gc)("after CCM overflow handle");
       }
 
       clear_region_fields();

@@ -149,6 +149,7 @@ class outputStream;
   LOG_TAG(plab) \
   LOG_TAG(placeholders) \
   LOG_TAG(preempt) \
+  LOG_TAG(prefetch) \
   LOG_TAG(preorder)  /* Trace all classes loaded in order referenced (not loaded) */ \
   LOG_TAG(preview)   /* Trace loading of preview feature types */ \
   LOG_TAG(promotion) \
@@ -209,8 +210,7 @@ class outputStream;
   LOG_TAG(vmoperation) \
   LOG_TAG(vmthread) \
   LOG_TAG(vtables) \
-  LOG_TAG(vtablestubs) \
-  LOG_TAG(prefetch)
+  LOG_TAG(vtablestubs)
 
 #define PREFIX_LOG_TAG(T) (LogTag::_##T)
 
