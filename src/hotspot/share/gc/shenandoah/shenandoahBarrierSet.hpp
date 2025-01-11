@@ -35,7 +35,11 @@ class ShenandoahBarrierSet: public BarrierSet {
 private:
   ShenandoahHeap* const _heap;
   BufferNode::Allocator _satb_mark_queue_buffer_allocator;
+  BufferNode::Allocator _prefetch_mark_queue_buffer_allocator;
   ShenandoahSATBMarkQueueSet _satb_mark_queue_set;
+
+  // Haoran: modify
+  ShenandoahPrefetchQueueSet _prefetch_queue_set;
 
 public:
   ShenandoahBarrierSet(ShenandoahHeap* heap);
@@ -67,6 +71,11 @@ public:
 
   static bool is_native_access(DecoratorSet decorators) {
     return (decorators & IN_NATIVE) != 0;
+  }
+
+  // Haoran: modify
+  static ShenandoahPrefetchQueueSet& prefetch_queue_set() {
+    return barrier_set()->_prefetch_queue_set;
   }
 
   void print_on(outputStream* st) const;

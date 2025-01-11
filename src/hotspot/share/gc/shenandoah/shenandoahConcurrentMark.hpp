@@ -45,6 +45,12 @@ public:
 
   static void cancel();
 
+  // Haoran: modify
+  bool _in_cm;
+  void set_in_cm(bool in_cm) {_in_cm = in_cm;}
+  bool in_cm() {return _in_cm;}
+
+
 private:
   void finish_mark_work();
 };

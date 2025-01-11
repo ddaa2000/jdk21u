@@ -44,6 +44,9 @@
 #include "runtime/continuation.hpp"
 #include "runtime/threads.hpp"
 
+#include "gc/shenandoah/shenandoahConcurrentPrefetch.inline.hpp"
+
+
 class ShenandoahConcurrentMarkingTask : public WorkerTask {
 private:
   ShenandoahConcurrentMark* const _cm;
@@ -123,6 +126,26 @@ public:
       ShenandoahSATBAndRemarkThreadsClosure tc(satb_mq_set,
                                                ShenandoahIUBarrier ? &mark_cl : nullptr);
       Threads::possibly_parallel_threads_do(true /* is_par */, &tc);
+
+      // Haoran: modify
+      ShenandoahMarkTask t;
+      ShenandoahObjToScanQueue* pq = ShenandoahHeap::heap()->concurrent_prefetch()->task_queues()->claim_next();
+
+      while(ShenandoahHeap::heap()->concurrent_prefetch()->_in_pf) {
+        continue;
+      }
+
+      while(pq != NULL){
+        while(pq->pop(t)){
+          if(!heap->is_in_reserved(t.obj())) {
+            ShouldNotReachHere();
+          }
+          shenandoah_assert_correct(NULL, t.obj());
+          q->push(t);
+        }
+
+        pq = ShenandoahHeap::heap()->concurrent_prefetch()->task_queues()->claim_next();
+      }
     }
     _cm->mark_loop(worker_id, _terminator, rp,
                    false /*not cancellable*/,
@@ -133,7 +156,7 @@ public:
 };
 
 ShenandoahConcurrentMark::ShenandoahConcurrentMark() :
-  ShenandoahMark() {}
+  ShenandoahMark(), _in_cm(0) {}
 
 // Mark concurrent roots during concurrent phases
 class ShenandoahMarkConcurrentRootsTask : public WorkerTask {
@@ -202,6 +225,13 @@ void ShenandoahConcurrentMark::concurrent_mark() {
   uint nworkers = workers->active_workers();
   task_queues()->reserve(nworkers);
 
+  // Haoran: modify
+  {
+    MutexLockerEx pl(CPF_lock, Mutex::_no_safepoint_check_flag);
+    CPF_lock->notify();
+  }
+
+
   ShenandoahSATBMarkQueueSet& qset = ShenandoahBarrierSet::satb_mark_queue_set();
   ShenandoahFlushSATBHandshakeClosure flush_satb(qset);
   for (uint flushes = 0; flushes < ShenandoahMaxSATBBufferFlushes; flushes++) {
@@ -256,10 +286,17 @@ void ShenandoahConcurrentMark::finish_mark_work() {
 
   StrongRootsScope scope(nworkers);
   TaskTerminator terminator(nworkers, task_queues());
+    // Haoran: modify
+  _heap->concurrent_prefetch()->task_queues()->clear_claimed();
+
+
   ShenandoahFinalMarkingTask task(this, &terminator, ShenandoahStringDedup::is_enabled());
   heap->workers()->run_task(&task);
 
   assert(task_queues()->is_empty(), "Should be empty");
+  // Haoran: modify
+  assert(_heap->concurrent_prefetch()->task_queues()->is_empty(), "Should be empty");
+
 }
 
 
@@ -267,4 +304,8 @@ void ShenandoahConcurrentMark::cancel() {
   clear();
   ShenandoahReferenceProcessor* rp = ShenandoahHeap::heap()->ref_processor();
   rp->abandon_partial_discovery();
+
+  // Haoran: modify
+  _in_cm = 0;
+  _heap->concurrent_prefetch()->cancel();
 }

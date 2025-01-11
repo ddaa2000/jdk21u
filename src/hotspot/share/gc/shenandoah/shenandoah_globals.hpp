@@ -355,6 +355,13 @@
   product(bool, ShenandoahStackWatermarkBarrier, true, DIAGNOSTIC,          \
           "Turn on/off stack watermark barriers in Shenandoah")             \
                                                                             \
+  product(size_t, ShenandoahPrefetchBufferSize, 128,                        \
+          "Number of entries in an PREFETCH log buffer.")                   \
+          range(1, max_uintx)                                               \
+                                                                            \
+  product(bool, ShenandoahPrefetchBarrier, false,                           \
+          "Turn on/off prefetch barriers in Shenandoah")                    \
+                                                                            \
   develop(bool, ShenandoahVerifyOptoBarriers, false,                        \
           "Verify no missing barriers in C2.")                              \
                                                                             \

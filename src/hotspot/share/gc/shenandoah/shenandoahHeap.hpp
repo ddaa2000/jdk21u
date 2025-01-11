@@ -41,8 +41,13 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/stack.hpp"
 
+#include "gc/shared/ptrQueue.hpp"
+#include "gc/shenandoah/shenandoahSATBMarkQueueSet.hpp"
+
 class ConcurrentGCTimer;
 class ObjectIterateScanRootClosure;
+// Haoran: modify
+class ShenandoahControlPrefetchThread;
 class ShenandoahCollectorPolicy;
 class ShenandoahControlThread;
 class ShenandoahGCSession;
@@ -64,6 +69,12 @@ class ShenandoahReferenceProcessor;
 class ShenandoahVerifier;
 class ShenandoahWorkerThreads;
 class VMStructs;
+
+// Haoran: Modify
+class ShenandoahConcurrentPrefetch;
+
+class ShenandoahPrefetchQueueSet;
+
 
 // Used for buffering per-region liveness data.
 // Needed since ShenandoahHeapRegion uses atomics to update liveness.
@@ -211,11 +222,21 @@ private:
   ShenandoahWorkerThreads* _workers;
   ShenandoahWorkerThreads* _safepoint_workers;
 
+  // Haoran: modify
+  uint _max_prefetch_workers;
+  ShenandoahWorkerThreads* _prefetch_workers;
+
 public:
   uint max_workers();
+  // Haoran: modify
+  uint max_prefetch_workers();  
+
   void assert_gc_workers(uint nworker) NOT_DEBUG_RETURN;
 
   WorkerThreads* workers() const;
+    // Haoran: modify
+  WorkerThreads* prefetch_workers() const;
+
   WorkerThreads* safepoint_workers() override;
 
   void gc_threads_do(ThreadClosure* tcl) const override;
@@ -385,6 +406,12 @@ private:
   ShenandoahPacer*           _pacer;
   ShenandoahVerifier*        _verifier;
 
+  // Haoran: modify
+  ShenandoahConcurrentPrefetch*  _spf;
+  // Haoran: modify
+  // ShenandoahConcurrentPrefetch* _pf;
+  ShenandoahControlPrefetchThread* _pf_thread;
+
   ShenandoahPhaseTimings*    _phase_timings;
 
   ShenandoahControlThread*   control_thread()          { return _control_thread;    }
@@ -399,6 +426,9 @@ public:
   ShenandoahPhaseTimings*    phase_timings()     const { return _phase_timings;     }
 
   ShenandoahVerifier*        verifier();
+    // Haoran: modify
+  ShenandoahConcurrentPrefetch* concurrent_prefetch() const { return _spf; }
+  
 
 // ---------- VM subsystem bindings
 //
@@ -563,6 +593,8 @@ private:
   bool _aux_bitmap_region_special;
 
   ShenandoahLiveData** _liveness_cache;
+    // Haoran: modify
+  ShenandoahLiveData** _prefetch_liveness_cache;
 
 public:
   inline ShenandoahMarkingContext* complete_marking_context() const;
@@ -575,6 +607,12 @@ public:
 
   template<class T>
   inline void marked_object_iterate(ShenandoahHeapRegion* region, T* cl, HeapWord* limit);
+
+  template<class T>
+  inline void marked_local_object_iterate(ShenandoahHeapRegion* region, T* cl);
+  template<class T>
+  inline void unevac_page_iterate(ShenandoahHeapRegion* region, T* cl);
+
 
   template<class T>
   inline void marked_object_oop_iterate(ShenandoahHeapRegion* region, T* cl, HeapWord* limit);
@@ -592,6 +630,11 @@ public:
   // Liveness caching support
   ShenandoahLiveData* get_liveness_cache(uint worker_id);
   void flush_liveness_cache(uint worker_id);
+
+    // Haoran: modify
+  ShenandoahLiveData* get_prefetch_liveness_cache(uint worker_id);
+  // Haoran: modify
+  void flush_prefetch_liveness_cache(uint worker_id);
 
   size_t pretouch_heap_page_size() { return _pretouch_heap_page_size; }
 
@@ -653,6 +696,16 @@ private:
 
   void try_inject_alloc_failure();
   bool should_inject_alloc_failure();
+
+public:
+  // Haoran: modify
+  BufferNode::Allocator _prefetch_mark_queue_buffer_allocator;
+  // ShenandoahPrefetchQueueSet _prefetch_queue_set;
+
+  // Haoran: modify
+  // ShenandoahPrefetchQueueSet* prefetch_queue_set() { return &_prefetch_queue_set; }
+  struct epoch_struct* user_buf;
+  
 };
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHHEAP_HPP

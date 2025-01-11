@@ -50,7 +50,9 @@ ShenandoahBarrierSet::ShenandoahBarrierSet(ShenandoahHeap* heap) :
              BarrierSet::FakeRtti(BarrierSet::ShenandoahBarrierSet)),
   _heap(heap),
   _satb_mark_queue_buffer_allocator("SATB Buffer Allocator", ShenandoahSATBBufferSize),
-  _satb_mark_queue_set(&_satb_mark_queue_buffer_allocator)
+  _satb_mark_queue_set(&_satb_mark_queue_buffer_allocator),
+  _prefetch_mark_queue_buffer_allocator("Prefetch Queue Allocator", ShenandoahPrefetchBufferSize),
+  _prefetch_queue_set() // Haoran: modify
 {
 }
 
@@ -94,10 +96,12 @@ void ShenandoahBarrierSet::on_thread_attach(Thread *thread) {
   assert(!thread->is_Java_thread() || !SafepointSynchronize::is_at_safepoint(),
          "We should not be at a safepoint");
   SATBMarkQueue& queue = ShenandoahThreadLocalData::satb_mark_queue(thread);
+  ShenandoahPrefetchQueue& prefetch_queue = ShenandoahThreadLocalData::prefetch_queue(thread);
   assert(!queue.is_active(), "SATB queue should not be active");
   assert(queue.buffer() == nullptr, "SATB queue should not have a buffer");
   assert(queue.index() == 0, "SATB queue index should be zero");
   queue.set_active(_satb_mark_queue_set.is_active());
+  prefetch_queue.set_active(_satb_mark_queue_set.is_active());
   if (thread->is_Java_thread()) {
     ShenandoahThreadLocalData::set_gc_state(thread, _heap->gc_state());
     ShenandoahThreadLocalData::initialize_gclab(thread);

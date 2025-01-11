@@ -48,6 +48,9 @@ public:
   static oopDesc* load_reference_barrier_phantom_narrow(oopDesc* src, narrowOop* load_addr);
 
   static void shenandoah_clone_barrier(oopDesc* src);
+
+  // Haoran: modify
+  static void write_ref_field_prefetch_entry(oopDesc* new_val, JavaThread* thread);
 };
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHRUNTIME_HPP

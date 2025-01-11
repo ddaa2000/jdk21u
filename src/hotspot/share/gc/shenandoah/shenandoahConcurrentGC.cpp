@@ -579,7 +579,13 @@ void ShenandoahConcurrentGC::op_mark_roots() {
 }
 
 void ShenandoahConcurrentGC::op_mark() {
+  {
+    _scm->set_in_cm(true);
+    _pf_thread->set_started();
+	}
   _mark.concurrent_mark();
+  _scm->set_in_cm(false);
+  _pf_thread->set_idle();
 }
 
 void ShenandoahConcurrentGC::op_final_mark() {

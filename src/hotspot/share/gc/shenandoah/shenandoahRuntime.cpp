@@ -83,3 +83,9 @@ JRT_END
 JRT_LEAF(oopDesc*, ShenandoahRuntime::load_reference_barrier_phantom_narrow(oopDesc * src, narrowOop* load_addr))
   return (oopDesc*) ShenandoahBarrierSet::barrier_set()->load_reference_barrier<narrowOop>(ON_PHANTOM_OOP_REF, oop(src), load_addr);
 JRT_END
+
+// Haoran: modify
+// Shenandoah prefetch barrier slowpath
+JRT_LEAF(void, ShenandoahRuntime::write_ref_field_prefetch_entry(oopDesc* new_val, JavaThread* thread))
+  ShenandoahThreadLocalData::prefetch_queue(thread).enqueue(new_val);
+JRT_END

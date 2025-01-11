@@ -68,13 +68,16 @@ ShenandoahHeapRegion::ShenandoahHeapRegion(HeapWord* start, size_t index, bool c
   _gclab_allocs(0),
   _live_data(0),
   _critical_pins(0),
-  _update_watermark(start) {
+  _update_watermark(start),
+  unevac_pages(NULL),
+  page_cnt(0) {
 
   assert(Universe::on_page_boundary(_bottom) && Universe::on_page_boundary(_end),
          "invalid space boundaries");
   if (ZapUnusedHeapArea && committed) {
     SpaceMangler::mangle_region(MemRegion(_bottom, _end));
   }
+  unevac_pages = NEW_C_HEAP_ARRAY(HeapWord*, size_words / 512, mtGC);
 }
 
 void ShenandoahHeapRegion::report_illegal_transition(const char *method) {

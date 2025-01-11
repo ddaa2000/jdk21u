@@ -60,6 +60,19 @@ template <class T, StringDedupMode STRING_DEDUP>
 void ShenandoahMark::do_task(ShenandoahObjToScanQueue* q, T* cl, ShenandoahLiveData* live_data, StringDedup::Requests* const req, ShenandoahMarkTask* task) {
   oop obj = task->obj();
 
+  // oop mask_obj = (oop)((size_t)obj & ((1ULL<<47)-1));
+  // size_t page_id = ((size_t)mask_obj - SEMERU_START_ADDR)/4096;
+  // if(task->is_not_chunked() && !((size_t)obj & (1ULL<<47)) && _heap->user_buf->page_stats[page_id] != 0) {
+  //   mask_obj = (oop)((size_t)obj | (1ULL<<47));
+  //   bool pushed = q->push_back(ShenandoahMarkTask(mask_obj));
+  //   assert(pushed, "Should be able to push");
+  //   return;
+  // }
+  
+  // obj = mask_obj;
+
+  //hua: todo there are two should not reach here checks in the jdk12 version of memliner
+
   shenandoah_assert_not_forwarded(nullptr, obj);
   shenandoah_assert_marked(nullptr, obj);
   shenandoah_assert_not_in_cset_except(nullptr, obj, ShenandoahHeap::heap()->cancelled_gc());

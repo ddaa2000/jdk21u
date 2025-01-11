@@ -35,6 +35,8 @@
 #include "utilities/debug.hpp"
 #include "utilities/sizes.hpp"
 
+#include "gc/shenandoah/shenandoahHeap.hpp"
+
 class ShenandoahThreadLocalData {
 private:
   char _gc_state;
@@ -42,15 +44,21 @@ private:
   uint8_t                 _oom_scope_nesting_level;
   bool                    _oom_during_evac;
   SATBMarkQueue           _satb_mark_queue;
+  // Haoran: modify
+  PrefetchQueue  _prefetch_queue;
+
   PLAB* _gclab;
   size_t _gclab_size;
   double _paced_time;
+
+  
 
   ShenandoahThreadLocalData() :
     _gc_state(0),
     _oom_scope_nesting_level(0),
     _oom_during_evac(false),
     _satb_mark_queue(&ShenandoahBarrierSet::satb_mark_queue_set()),
+    _prefetch_queue(&ShenandoahBarrierSet::prefetch_queue_set()),
     _gclab(nullptr),
     _gclab_size(0),
     _paced_time(0) {
@@ -71,6 +79,11 @@ private:
     return Thread::gc_data_offset() + byte_offset_of(ShenandoahThreadLocalData, _satb_mark_queue);
   }
 
+  // Haoran: modify
+  static ByteSize prefetch_queue_offset() {
+    return Thread::gc_data_offset() + byte_offset_of(ShenandoahThreadLocalData, _prefetch_queue);
+  }
+
 public:
   static void create(Thread* thread) {
     new (data(thread)) ShenandoahThreadLocalData();
@@ -82,6 +95,11 @@ public:
 
   static SATBMarkQueue& satb_mark_queue(Thread* thread) {
     return data(thread)->_satb_mark_queue;
+  }
+
+  // Haoran: modify
+  static PrefetchQueue& prefetch_queue(Thread* thread) {
+    return data(thread)->_prefetch_queue;
   }
 
   static void set_gc_state(Thread* thread, char gc_state) {
@@ -168,6 +186,20 @@ public:
   static ByteSize satb_mark_queue_buffer_offset() {
     return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_buf();
   }
+
+    // Haoran: modify
+  static ByteSize prefetch_queue_active_offset() {
+    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_active();
+  }
+
+  static ByteSize prefetch_queue_index_offset() {
+    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_index();
+  }
+
+  static ByteSize prefetch_queue_buffer_offset() {
+    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_buf();
+  }
+  
 
   static ByteSize gc_state_offset() {
     return Thread::gc_data_offset() + byte_offset_of(ShenandoahThreadLocalData, _gc_state);

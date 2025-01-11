@@ -398,6 +398,10 @@ private:
   inline void internal_increase_live_data(size_t s);
 
   void set_state(RegionState to);
+
+public:
+  HeapWord** unevac_pages; 
+  int page_cnt;
 };
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHHEAPREGION_HPP
