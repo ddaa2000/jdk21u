@@ -164,11 +164,11 @@
           "Number of threads prefetch will use")                            \
           range(0, max_jint)                                                \
                                                                             \
-  product(uint, PrefetchNum, 0,                                             \
+  product(uint, PrefetchNum, 8192,                                          \
           "The maximum objects to be marked during prefetching")            \
           range(0, max_jint)                                                \
                                                                             \
-  product(uint, PrefetchSize, 0,                                            \
+  product(uint, PrefetchSize, 1000000,                                      \
           "The maximum size of objects during prefetching")                 \
           range(0, max_jint)                                                \
                                                                             \

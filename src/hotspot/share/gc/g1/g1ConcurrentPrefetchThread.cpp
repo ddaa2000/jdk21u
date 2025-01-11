@@ -239,6 +239,10 @@ void G1ConcurrentPrefetchThread::run_service() {
       // the "end" logging is inside the loop and not at the end of
       // a scope. Also, the timer doesn't support nesting.
       // Mimicking the same log output instead.
+      for(int i = 0; i < 1; i++){
+        _pf->task(i)->clear_memliner_stats();
+      }
+
       if (_state == FullMark){
         while(_cm->in_conc_mark_from_roots() && !_pf->has_aborted() && !_cm->has_aborted() && !_cm->has_overflown()) {
           _pf->mark_from_stacks();
@@ -249,6 +253,10 @@ void G1ConcurrentPrefetchThread::run_service() {
       }
 
       log_info(gc)("prefetcher finish conc prefetching");
+
+      for(int i = 0; i < 1; i++){
+        _pf->task(i)->print_memliner_stats();
+      }
 
       {
         // SuspendibleThreadSetJoiner sts_join(!G1UseSTWMarking); //hua: todo merge

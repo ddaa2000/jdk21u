@@ -148,7 +148,7 @@
           "Number of entries in an SATB log buffer.")                       \
           range(1, max_uintx)                                               \
                                                                             \
-  product(size_t, G1PrefetchBufferSize, 128,                                \
+  product(size_t, G1PrefetchBufferSize, 1024,                               \
           "Number of entries in an PREFETCH log buffer.")                   \
           range(1, max_uintx)                                               \
                                                                             \

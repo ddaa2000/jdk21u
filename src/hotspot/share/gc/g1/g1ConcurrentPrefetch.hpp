@@ -513,6 +513,14 @@ private:
   // NumberSeq                   _step_times_ms;
   // Elapsed time of this task
   double                      _elapsed_time_ms;
+
+  uint _count_local_queue_page_local;
+  uint _count_local_queue_page_remote;
+  // uint _count_scan_stat_0;
+  // uint _count_scan_stat_1;
+  // uint _count_scan;
+  // uint _count_push_back;
+
   // Termination time of this task
   // double                      _termination_time_ms;
   // When this task got into the termination protocol
@@ -661,6 +669,18 @@ public:
   Pair<size_t, size_t> flush_mark_stats_cache();
 //   // Prints statistics associated with this task
 //   void print_stats();
+  void clear_memliner_stats(){
+    _count_local_queue_page_local = 0;
+    _count_local_queue_page_remote = 0;
+  }
+
+  void print_memliner_stats(){  
+    log_info(gc)(
+      "prefetcher _count_local_queue_page_local: %u _count_local_queue_page_remote: %u",
+      _count_local_queue_page_local, _count_local_queue_page_remote
+    );
+  }
+
 };
 
 

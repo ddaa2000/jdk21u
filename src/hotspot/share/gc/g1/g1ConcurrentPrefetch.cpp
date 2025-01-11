@@ -515,6 +515,25 @@ void G1PFTask::drain_local_queue(bool partially) {
   while(_words_scanned < max_size && _objs_scanned < max_num_objects && !_cm->has_aborted() && !has_aborted()) {
     // bool ret = _task_queue->pop_global(entry);
     bool ret = _task_queue->pop_local(entry);
+
+    if (ret) {
+      size_t addr;
+      if(entry.is_array_slice()){
+        addr = (size_t)entry.slice();
+      }else{
+        addr = cast_from_oop<size_t>(entry.obj());
+      }
+      size_t mask_addr = addr & ((1ULL<<63)-1);
+      size_t page_id = (mask_addr - SEMERU_START_ADDR)/4096;
+      bool page_likely_local = _g1h->user_buf->page_stats[page_id] == 0;
+
+      if(page_likely_local){
+        _count_local_queue_page_local += 1;
+      } else {
+        _count_local_queue_page_remote += 1;
+      }
+    }
+
     if(ret) scan_task_entry(entry);
     else break;
   }

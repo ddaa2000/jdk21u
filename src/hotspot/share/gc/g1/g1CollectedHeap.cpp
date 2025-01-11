@@ -1418,6 +1418,7 @@ jint G1CollectedHeap::initialize() {
       tty->print("Commit user_buffer: 0x%lx, bytes_len: 0x%lx \n",
         (unsigned long)user_buf, reserved_byte_size/4096 + 1024);
     }
+    // memset(user_buf, 0x1, reserved_byte_size/4096 + 1024);
 
     // #2 Ask kernel to fill the physical pages of the buffer
     int ret = syscall(457, (unsigned long)user_buf, reserved_byte_size/4096 + 512);

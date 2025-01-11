@@ -1031,6 +1031,26 @@ void G1YoungCollector::collect() {
   wait_for_root_region_scanning();
 
   G1YoungGCVerifierMark vm(this);
+
+  if(MemLinerEnableMemPool){
+    size_t pages_mapped = 0;
+    size_t pages_not_mapped = 0;
+    for(size_t i = 0; i < 32 * 1024 * 1024 / 4; i++){
+      if(_g1h->user_buf->page_stats[i] == 0){
+        pages_mapped += 1;
+      } else {
+        pages_not_mapped += 1;
+      }
+
+    }
+    log_info(gc)("pages mapping: mapped %lf GB, others %lf GB", pages_mapped * 4.0 / 1024 / 1024,
+    pages_not_mapped * 4.0 / 1024 / 1024);
+      // size_t mask_addr = addr & ((1ULL<<63)-1);
+      // size_t page_id = (mask_addr - SEMERU_START_ADDR)/4096;
+      // bool has_pushed_back = (addr & (1ULL<<63)) != 0;
+      // bool page_likely_local = _g1h->user_buf->page_stats[page_id] == 0;
+  }
+
   {
     // Actual collection work starts and is executed (only) in this scope.
 
