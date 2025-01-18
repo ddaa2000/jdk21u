@@ -129,8 +129,10 @@ class G1BarrierSetC1 : public ModRefBarrierSetC1 {
   virtual void pre_barrier(LIRAccess& access, LIR_Opr addr_opr,
                            LIR_Opr pre_val, CodeEmitInfo* info);
   virtual void post_barrier(LIRAccess& access, LIR_Opr addr, LIR_Opr new_val);
+  virtual LIR_Opr prefetch_load_barrier(LIRGenerator* gen, LIR_Opr obj, LIR_Opr addr, DecoratorSet decorators);
 
   virtual void load_at_resolved(LIRAccess& access, LIR_Opr result);
+  LIR_Opr ensure_in_register(LIRGenerator* gen, LIR_Opr obj, BasicType type);
 
  public:
   G1BarrierSetC1()

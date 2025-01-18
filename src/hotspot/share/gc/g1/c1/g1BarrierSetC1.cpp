@@ -185,10 +185,10 @@ void G1BarrierSetC1::load_at_resolved(LIRAccess& access, LIR_Opr result) {
   bool is_anonymous = (decorators & ON_UNKNOWN_OOP_REF) != 0;
   LIRGenerator *gen = access.gen();
 
-  BarrierSetC1::load_at_resolved(access, result);
 
   if (access.is_oop() && (is_weak || is_phantom || is_anonymous)) {
     // Register the value in the referent field with the pre-barrier
+    BarrierSetC1::load_at_resolved(access, result);
     LabelObj *Lcont_anonymous;
     if (is_anonymous) {
       Lcont_anonymous = new LabelObj();
@@ -199,7 +199,76 @@ void G1BarrierSetC1::load_at_resolved(LIRAccess& access, LIR_Opr result) {
     if (is_anonymous) {
       __ branch_destination(Lcont_anonymous->label());
     }
+  } else if(access.is_oop()){
+    // BarrierSetC1::load_at_resolved(access, result);
+    LIRGenerator* gen = access.gen();
+    DecoratorSet decorators = access.decorators();
+
+    LIR_Opr tmp = gen->new_register(T_OBJECT);
+    BarrierSetC1::load_at_resolved(access, tmp);
+    tmp = prefetch_load_barrier(gen, tmp, access.resolved_addr(), decorators);
+    __ move(tmp, result);
+  } else {
+    BarrierSetC1::load_at_resolved(access, result);
   }
+}
+
+LIR_Opr G1BarrierSetC1::ensure_in_register(LIRGenerator* gen, LIR_Opr obj, BasicType type) {
+  if (!obj->is_register()) {
+    LIR_Opr obj_reg;
+    if (obj->is_constant()) {
+      obj_reg = gen->new_register(type);
+      __ move(obj, obj_reg);
+    } else {
+      obj_reg = gen->new_pointer_register();
+      __ leal(obj, obj_reg);
+    }
+    obj = obj_reg;
+  }
+  return obj;
+}
+
+LIR_Opr G1BarrierSetC1::prefetch_load_barrier(LIRGenerator* gen, LIR_Opr obj, LIR_Opr addr, DecoratorSet decorators) {
+
+  obj = ensure_in_register(gen, obj, T_OBJECT);
+  assert(obj->is_register(), "must be a register at this point");
+  addr = ensure_in_register(gen, addr, T_ADDRESS);
+  assert(addr->is_register(), "must be a register at this point");
+  LIR_Opr result = gen->result_register_for(obj->value_type());
+  __ move(obj, result);
+  // LIR_Opr tmp1 = gen->new_register(T_ADDRESS);
+  // LIR_Opr tmp2 = gen->new_register(T_ADDRESS);
+
+  LIR_Opr thrd = gen->getThreadPointer();
+  // LIR_Address* active_flag_addr =
+  //   new LIR_Address(thrd,
+  //                   in_bytes(ShenandoahThreadLocalData::gc_state_offset()),
+  //                   T_BYTE);
+  // // Read and check the gc-state-flag.
+  // LIR_Opr flag_val = gen->new_register(T_INT);
+  // __ load(active_flag_addr, flag_val);
+  // int flags = ShenandoahHeap::HAS_FORWARDED;
+  // if (!ShenandoahBarrierSet::is_strong_access(decorators)) {
+  //   flags |= ShenandoahHeap::WEAK_ROOTS;
+  // }
+  // LIR_Opr mask = LIR_OprFact::intConst(flags);
+  // LIR_Opr mask_reg = gen->new_register(T_INT);
+  // __ move(mask, mask_reg);
+
+  // if (two_operand_lir_form) {
+  //   __ logical_and(flag_val, mask_reg, flag_val);
+  // } else {
+  //   LIR_Opr masked_flag = gen->new_register(T_INT);
+  //   __ logical_and(flag_val, mask_reg, masked_flag);
+  //   flag_val = masked_flag;
+  // }
+  // __ cmp(lir_cond_notEqual, flag_val, LIR_OprFact::intConst(0));
+
+  // CodeStub* slow = new ShenandoahLoadReferenceBarrierStub(obj, addr, result, tmp1, tmp2, decorators);
+  // __ branch(lir_cond_notEqual, slow);
+  // __ branch_destination(slow->continuation());
+
+  return result;
 }
 
 class C1G1PreBarrierCodeGenClosure : public StubAssemblerCodeGenClosure {
