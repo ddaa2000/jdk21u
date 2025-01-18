@@ -123,8 +123,8 @@ void G1BarrierSetAssembler::load_at(MacroAssembler* masm, DecoratorSet decorator
   bool on_weak = (decorators & ON_WEAK_OOP_REF) != 0;
   bool on_phantom = (decorators & ON_PHANTOM_OOP_REF) != 0;
   bool on_reference = on_weak || on_phantom;
-  ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
   if (on_oop && on_reference) {
+    ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
     Register thread = NOT_LP64(tmp_thread) LP64_ONLY(r15_thread);
 
 #ifndef _LP64
@@ -157,7 +157,102 @@ void G1BarrierSetAssembler::load_at(MacroAssembler* masm, DecoratorSet decorator
 #ifndef _LP64
     __ pop(thread);
 #endif
+  } else if (on_oop){
+    oop_load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
+    // ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
+
+  } else {
+    ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, tmp1, tmp_thread);
   }
+}
+
+void G1BarrierSetAssembler::oop_load_at(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
+                                    Register dst, Address src, Register tmp1, Register tmp_thread) {
+  bool in_heap = (decorators & IN_HEAP) != 0;
+  bool as_normal = (decorators & AS_NORMAL) != 0;
+
+  bool needs_pre_barrier = as_normal;
+  // bool needs_post_barrier = val != noreg && in_heap;
+
+  Register rthread = LP64_ONLY(r15_thread) NOT_LP64(rcx);
+  // // flatten object address if needed
+  // // We do it regardless of precise because we need the registers
+  // if (dst.index() == noreg && dst.disp() == 0) {
+  //   if (dst.base() != tmp1) {
+  //     __ movptr(tmp1, dst.base());
+  //   }
+  // } else {
+  //   __ lea(tmp1, dst);
+  // }
+
+#ifndef _LP64
+  InterpreterMacroAssembler *imasm = static_cast<InterpreterMacroAssembler*>(masm);
+#endif
+
+  NOT_LP64(__ get_thread(rcx));
+  NOT_LP64(imasm->save_bcp());
+
+  Register prev_tmp1 = tmp1;
+
+  ModRefBarrierSetAssembler::load_at(masm, decorators, type, dst, src, prev_tmp1, tmp_thread);
+
+  if (needs_pre_barrier) {
+    Register tmp2 = noreg;
+
+    for (int i = 0; i < 8; i++) {
+      Register r = as_Register(i);
+      if (r != rsp && r != rbp && r != dst && r != src.base() && r != src.index() && r != tmp1) {
+        if (tmp1 == noreg) {
+          tmp1 = r;
+        } else {
+          tmp2 = r;
+          break;
+        }
+      }
+    }
+    __ push(tmp1);
+    __ push(tmp2);
+
+    // if (src.index() == noreg && src.disp() == 0) {
+    //   if (src.base() != tmp1) {
+    //     __ movptr(tmp1, src.base());
+    //   }
+    // } else {
+    //   __ lea(tmp1, src);
+    // }
+
+    __ mov(tmp1, dst);
+    
+    g1_prefetch_load_barrier_pre(masm /*masm*/,
+                         tmp1 /* obj */,
+                         rthread /* thread */,
+                         tmp2,
+                         false);
+    __ pop(tmp2);
+    __ pop(tmp1);
+  }
+  // if (val == noreg) {
+  //   BarrierSetAssembler::store_at(masm, decorators, type, Address(tmp1, 0), val, noreg, noreg, noreg);
+  // } else {
+  //   // Register new_val = val;
+  //   // if (needs_post_barrier) {
+  //   //   // G1 barrier needs uncompressed oop for region cross check.
+  //   //   if (UseCompressedOops) {
+  //   //     new_val = tmp2;
+  //   //     __ movptr(new_val, val);
+  //   //   }
+  //   // }
+  //   BarrierSetAssembler::store_at(masm, decorators, type, Address(tmp1, 0), val, noreg, noreg, noreg);
+  //   // if (needs_post_barrier) {
+  //   //   g1_write_barrier_post(masm /*masm*/,
+  //   //                         tmp1 /* store_adr */,
+  //   //                         new_val /* new_val */,
+  //   //                         rthread /* thread */,
+  //   //                         tmp3 /* tmp */,
+  //   //                         tmp2 /* tmp2 */);
+  //   // }
+  // }
+  NOT_LP64(imasm->restore_bcp());
 }
 
 void G1BarrierSetAssembler::g1_write_barrier_pre(MacroAssembler* masm,
@@ -256,6 +351,122 @@ void G1BarrierSetAssembler::g1_write_barrier_pre(MacroAssembler* masm,
     __ MacroAssembler::call_VM_leaf_base(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_pre_entry), 2);
   } else {
     __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_pre_entry), pre_val, thread);
+  }
+
+  __ pop_call_clobbered_registers();
+
+  __ bind(done);
+}
+
+void G1BarrierSetAssembler::g1_prefetch_load_barrier_pre_work(MacroAssembler* masm,
+                                                 Register obj, //the obj to prefetch
+                                                 Register thread,
+                                                 Register tmp,
+                                                 Label* prefetch_runtime,
+                                                 Label* prefetch_done) {
+
+  Address prefetch_queue_index(thread, in_bytes(G1ThreadLocalData::prefetch_queue_index_offset()));
+  Address prefetch_buffer(thread, in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset()));
+
+  __ cmpptr(obj, NULL_WORD);
+  __ jcc(Assembler::equal, *prefetch_done);
+
+  __ movptr(tmp, prefetch_queue_index);
+  __ testptr(tmp, tmp);
+  __ jcc(Assembler::zero, *prefetch_runtime);
+  __ subptr(tmp, wordSize);
+  __ movptr(prefetch_queue_index, tmp);
+  __ addptr(tmp, prefetch_buffer);
+  __ movptr(Address(tmp, 0), obj);
+  __ jmp(*prefetch_done);
+
+// ----------------------------------------prefetch done -------------------------
+
+}
+
+void G1BarrierSetAssembler::g1_prefetch_load_barrier_pre(MacroAssembler* masm,
+                                                 Register obj,
+                                                 Register thread,
+                                                 Register tmp,
+                                                 bool expand_call) {
+  // If expand_call is true then we expand the call_VM_leaf macro
+  // directly to skip generating the check by
+  // InterpreterMacroAssembler::call_VM_leaf_base that checks _last_sp.
+
+  
+
+#ifdef _LP64
+  assert(thread == r15_thread, "must be");
+#endif // _LP64
+
+  Label done;
+  Label runtime;
+
+  // assert(pre_val != noreg, "check this code");
+
+  assert_different_registers(obj, thread, tmp);
+
+
+  // if (obj != noreg) {
+  //   assert(pre_val != rax, "check this code");
+  // }
+
+  // Address in_progress(thread, in_bytes(G1ThreadLocalData::satb_mark_queue_active_offset()));
+  // Address index(thread, in_bytes(G1ThreadLocalData::satb_mark_queue_index_offset()));
+  // Address buffer(thread, in_bytes(G1ThreadLocalData::satb_mark_queue_buffer_offset()));
+
+  Address prefetch_queue_active(thread, in_bytes(G1ThreadLocalData::prefetch_queue_active_offset()));
+
+  if (in_bytes(PrefetchQueue::byte_width_of_active()) == 4) {
+    __ cmpl(prefetch_queue_active, 0);
+  } else {
+    assert(in_bytes(PrefetchQueue::byte_width_of_active()) == 1, "Assumption");
+    __ cmpb(prefetch_queue_active, 0);
+  }
+  __ jcc(Assembler::equal, done);
+
+  // // Do we need to load the previous value?
+  // if (obj != noreg) {
+  //   __ load_heap_oop(pre_val, Address(obj, 0), noreg, noreg, AS_RAW);
+  // }
+
+  g1_prefetch_load_barrier_pre_work(masm, obj, thread, tmp, &runtime, &done);
+  __ jmp(done);
+
+  __ bind(runtime);
+
+  // Determine and save the live input values
+  __ push_call_clobbered_registers();
+
+  // Calling the runtime using the regular call_VM_leaf mechanism generates
+  // code (generated by InterpreterMacroAssember::call_VM_leaf_base)
+  // that checks that the *(ebp+frame::interpreter_frame_last_sp) == nullptr.
+  //
+  // If we care generating the pre-barrier without a frame (e.g. in the
+  // intrinsified Reference.get() routine) then ebp might be pointing to
+  // the caller frame and so this check will most likely fail at runtime.
+  //
+  // Expanding the call directly bypasses the generation of the check.
+  // So when we do not have have a full interpreter frame on the stack
+  // expand_call should be passed true.
+  
+
+  if (expand_call) {
+    LP64_ONLY( assert(pre_val != c_rarg1, "smashed arg"); )
+#ifdef _LP64
+    if (c_rarg1 != thread) {
+      __ mov(c_rarg1, thread);
+    }
+    if (c_rarg0 != obj) {
+      __ mov(c_rarg0, obj);
+    }
+#else
+    __ push(thread);
+    __ push(obj);
+#endif
+    __ MacroAssembler::call_VM_leaf_base(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), 2);
+  } else {
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), obj, thread);
   }
 
   __ pop_call_clobbered_registers();

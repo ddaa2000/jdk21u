@@ -53,8 +53,24 @@ class G1BarrierSetAssembler: public ModRefBarrierSetAssembler {
                              Register tmp,
                              Register tmp2);
 
+  void g1_prefetch_load_barrier_pre(MacroAssembler* masm,
+                            Register obj,
+                            Register thread,
+                            Register tmp,
+                            bool expand_call);
+
+  void g1_prefetch_load_barrier_pre_work(MacroAssembler* masm,
+                            Register obj,
+                            Register thread,
+                            Register tmp,
+                            Label *prefetch_runtime,
+                            Label *prefetch_done);
+
   virtual void oop_store_at(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
                             Address dst, Register val, Register tmp1, Register tmp2, Register tmp3);
+
+  virtual void oop_load_at(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
+                            Register dst, Address src, Register tmp1, Register tmp_thread);
 
  public:
   void gen_pre_barrier_stub(LIR_Assembler* ce, G1PreBarrierStub* stub);
