@@ -278,6 +278,32 @@ void G1ConcurrentPrefetch::pre_initial_mark() {
   // _root_regions.reset();
 }
 
+static inline bool requires_marking(const void* entry, G1CollectedHeap* g1h) {
+  // Includes rejection of null pointers.
+  assert(g1h->is_in_reserved(entry),
+         "Non-heap pointer in SATB buffer: " PTR_FORMAT, p2i(entry));
+
+  // HeapRegion* region = g1h->heap_region_containing(entry);
+  HeapRegion* region = g1h->heap_region_containing_or_null(entry);
+  if(region == nullptr){
+    ShouldNotReachHere();
+  }
+  
+  if (entry >= region->top_at_mark_start()) {
+    return false;
+  }
+
+  assert(oopDesc::is_oop(cast_to_oop(entry), true /* ignore mark word */),
+         "Invalid oop in SATB buffer: " PTR_FORMAT, p2i(entry));
+
+  return true;
+}
+
+static inline bool discard_entry(const void* entry, G1CollectedHeap* g1h) {
+  return !requires_marking(entry, g1h) || g1h->is_marked(cast_to_oop(entry));
+}
+
+
 class G1PFConcurrentPrefetchingTask : public WorkerTask {
   G1ConcurrentMark*     _cm;
   G1ConcurrentPrefetch*     _pf;
@@ -332,13 +358,19 @@ public:
               t = jtiwh.next();
             }
           }
+          G1CollectedHeap* g1h = G1CollectedHeap::heap();
           if(get_queue) {
             void* ptr;
             bool ret = prefetch_queue->dequeue(&ptr);
             //hua: should be like this:?
             // while (ret && ptr != NULL && _cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted()) {
             while (ret && ptr != NULL) {
-              if(!G1CollectedHeap::heap()->is_in_reserved(ptr)) break;
+              //hua: todo continue?
+              if(g1h->is_in_reserved(ptr)) break;
+              if(discard_entry(ptr, g1h)){ 
+                ret = prefetch_queue->dequeue(&ptr);
+                continue;
+              }
               bool success = task->make_reference_grey(cast_to_oop(ptr));
               if(success) {
                 // log_debug(prefetch)("Succesfully mark one in PFTask!");

@@ -1802,7 +1802,7 @@ void G1CollectedHeap::increment_old_marking_cycles_completed(bool concurrent,
   if (concurrent) {
     _cm_thread->set_idle();
     // Haoran: Modify
-    _pf_thread->set_idle();
+    // _pf_thread->set_idle();
   }
 
   // Notify threads waiting in System.gc() (with ExplicitGCInvokesConcurrent)

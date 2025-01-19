@@ -32,6 +32,8 @@ class LIR_Assembler;
 class StubAssembler;
 class G1PreBarrierStub;
 class G1PostBarrierStub;
+class G1PrefetchBarrierStub;
+
 
 class G1BarrierSetAssembler: public ModRefBarrierSetAssembler {
  protected:
@@ -75,9 +77,12 @@ class G1BarrierSetAssembler: public ModRefBarrierSetAssembler {
  public:
   void gen_pre_barrier_stub(LIR_Assembler* ce, G1PreBarrierStub* stub);
   void gen_post_barrier_stub(LIR_Assembler* ce, G1PostBarrierStub* stub);
+  void gen_prefetch_barrier_stub(LIR_Assembler* ce, G1PrefetchBarrierStub* stub);
 
   void generate_c1_pre_barrier_runtime_stub(StubAssembler* sasm);
   void generate_c1_post_barrier_runtime_stub(StubAssembler* sasm);
+  void generate_c1_prefetch_barrier_runtime_stub(StubAssembler* sasm);
+
 
   virtual void load_at(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
                        Register dst, Address src, Register tmp1, Register tmp_thread);

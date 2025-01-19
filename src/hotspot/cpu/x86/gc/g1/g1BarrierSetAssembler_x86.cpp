@@ -452,7 +452,7 @@ void G1BarrierSetAssembler::g1_prefetch_load_barrier_pre(MacroAssembler* masm,
   
 
   if (expand_call) {
-    LP64_ONLY( assert(pre_val != c_rarg1, "smashed arg"); )
+    LP64_ONLY( assert(obj != c_rarg1, "smashed arg"); )
 #ifdef _LP64
     if (c_rarg1 != thread) {
       __ mov(c_rarg1, thread);
@@ -651,6 +651,19 @@ void G1BarrierSetAssembler::gen_post_barrier_stub(LIR_Assembler* ce, G1PostBarri
   // Haoran: modify
   ce->store_parameter(new_val_reg, 1);
   __ call(RuntimeAddress(bs->post_barrier_c1_runtime_code_blob()->code_begin()));
+  __ jmp(*stub->continuation());
+}
+
+void G1BarrierSetAssembler::gen_prefetch_barrier_stub(LIR_Assembler* ce, G1PrefetchBarrierStub* stub) {
+  G1BarrierSetC1* bs = (G1BarrierSetC1*)BarrierSet::barrier_set()->barrier_set_c1();
+  __ bind(*stub->entry());
+  assert(stub->obj()->is_register(), "Precondition.");
+  // assert(stub->new_val()->is_register(), "Precondition.");
+  Register obj_reg = stub->obj()->as_register();
+  __ cmpptr(obj_reg, NULL_WORD);
+  __ jcc(Assembler::equal, *stub->continuation());
+  ce->store_parameter(obj_reg, 0);
+  __ call(RuntimeAddress(bs->prefetch_barrier_c1_runtime_code_blob()->code_begin()));
   __ jmp(*stub->continuation());
 }
 
@@ -859,6 +872,62 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
 
   __ pop(rcx);
   __ pop(rax);
+
+  __ epilogue();
+}
+
+void G1BarrierSetAssembler::generate_c1_prefetch_barrier_runtime_stub(StubAssembler* sasm) {
+  __ prologue("g1_prefetch_barrier", false);
+
+  // At this point we know new_value is non-null and the new_value crosses regions.
+  // Must check to see if card is already dirty
+
+  // const Register thread = NOT_LP64(rax) LP64_ONLY(r15_thread);
+
+  // Address prefetch_queue_active(thread, in_bytes(G1ThreadLocalData::prefetch_queue_active_offset()));
+  // Address prefetch_queue_index(thread, in_bytes(G1ThreadLocalData::prefetch_queue_index_offset()));
+  // Address prefetch_buffer(thread, in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset()));
+
+
+  // //Haoran:modify
+  // __ push(rax);
+  // const Register obj = rax;
+  // __ load_parameter(0, obj);
+  // Label prefetch_done;
+  // Label prefetch_runtime;
+
+  // __ push(rcx);
+  // const Register tmp2 = rcx;
+
+  // if (in_bytes(PrefetchQueue::byte_width_of_active()) == 4) {
+  //   __ cmpl(prefetch_queue_active, 0);
+  // } else {
+  //   assert(in_bytes(PrefetchQueue::byte_width_of_active()) == 1, "Assumption");
+  //   __ cmpb(prefetch_queue_active, 0);
+  // }
+  // __ jcc(Assembler::equal, prefetch_done);
+
+  // __ movptr(tmp2, prefetch_queue_index);
+  // __ testptr(tmp2, tmp2);
+  // __ jcc(Assembler::zero, prefetch_runtime);
+  // __ subptr(tmp2, wordSize);
+  // __ movptr(prefetch_queue_index, tmp2);
+  // __ addptr(tmp2, prefetch_buffer);
+  // __ movptr(Address(tmp2, 0), obj);
+  // __ jmp(prefetch_done);
+
+  // __ bind(prefetch_runtime);
+  // __ save_live_registers_no_oop_map(true);
+  // __ load_parameter(0, rcx);
+  // __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
+  // __ restore_live_registers(true);
+  // __ bind(prefetch_done);
+
+  // __ movptr(tmp2, Address(obj,0));
+  // __ pop(rcx);
+  // __ pop(rax);
+
+// ----------------------------------------prefetch done -------------------------
 
   __ epilogue();
 }

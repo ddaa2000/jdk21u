@@ -119,12 +119,37 @@ class G1PostBarrierStub: public CodeStub {
 #endif // PRODUCT
 };
 
+class G1PrefetchBarrierStub: public CodeStub {
+  friend class G1BarrierSetC1;
+private:
+  LIR_Opr _obj;
+public:
+  G1PrefetchBarrierStub(LIR_Opr obj):_obj(obj){
+    FrameMap* f = Compilation::current()->frame_map();
+    f->update_reserved_argument_area_size(2 * BytesPerWord);
+  }
+
+  LIR_Opr obj() const { return _obj; }
+
+  virtual void emit_code(LIR_Assembler* e);
+  virtual void visit(LIR_OpVisitState* visitor){
+    // don't pass in the code emit info since it's processed in the fast path
+    visitor->do_slow_case();
+    visitor->do_input(_obj);
+  }
+#ifndef PRODUCT
+  virtual void print_name(outputStream* out) const { out->print("G1PrefetchBarrierStub"); }
+#endif // PRODUCT
+};
+
 class CodeBlob;
 
 class G1BarrierSetC1 : public ModRefBarrierSetC1 {
  protected:
   CodeBlob* _pre_barrier_c1_runtime_code_blob;
   CodeBlob* _post_barrier_c1_runtime_code_blob;
+  CodeBlob* _prefetch_barrier_c1_runtime_code_blob;
+
 
   virtual void pre_barrier(LIRAccess& access, LIR_Opr addr_opr,
                            LIR_Opr pre_val, CodeEmitInfo* info);
@@ -137,10 +162,13 @@ class G1BarrierSetC1 : public ModRefBarrierSetC1 {
  public:
   G1BarrierSetC1()
     : _pre_barrier_c1_runtime_code_blob(nullptr),
-      _post_barrier_c1_runtime_code_blob(nullptr) {}
+      _post_barrier_c1_runtime_code_blob(nullptr),
+      _prefetch_barrier_c1_runtime_code_blob(nullptr) {}
 
   CodeBlob* pre_barrier_c1_runtime_code_blob() { return _pre_barrier_c1_runtime_code_blob; }
   CodeBlob* post_barrier_c1_runtime_code_blob() { return _post_barrier_c1_runtime_code_blob; }
+  CodeBlob* prefetch_barrier_c1_runtime_code_blob() { return _prefetch_barrier_c1_runtime_code_blob; }
+
 
   virtual void generate_c1_runtime_stubs(BufferBlob* buffer_blob);
 };

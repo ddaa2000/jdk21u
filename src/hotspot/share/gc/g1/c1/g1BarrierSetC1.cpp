@@ -48,6 +48,11 @@ void G1PostBarrierStub::emit_code(LIR_Assembler* ce) {
   bs->gen_post_barrier_stub(ce, this);
 }
 
+void G1PrefetchBarrierStub::emit_code(LIR_Assembler* ce) {
+  G1BarrierSetAssembler* bs = (G1BarrierSetAssembler*)BarrierSet::barrier_set()->barrier_set_assembler();
+  bs->gen_prefetch_barrier_stub(ce, this);
+}
+
 void G1BarrierSetC1::pre_barrier(LIRAccess& access, LIR_Opr addr_opr,
                                  LIR_Opr pre_val, CodeEmitInfo* info) {
   LIRGenerator* gen = access.gen();
@@ -235,38 +240,64 @@ LIR_Opr G1BarrierSetC1::prefetch_load_barrier(LIRGenerator* gen, LIR_Opr obj, LI
   addr = ensure_in_register(gen, addr, T_ADDRESS);
   assert(addr->is_register(), "must be a register at this point");
   LIR_Opr result = gen->result_register_for(obj->value_type());
+  // LabelObj *prefetch_done;
+  // prefetch_done = new LabelObj();
+
   __ move(obj, result);
+  // __ cmp(lir_cond_equal, obj, LIR_OprFact::oopConst(nullptr));
+  // __ branch(lir_cond_equal, prefetch_done->label());
+  
+
+  // __ branch(lir_cond_always, prefetch_done->label());
+  // __ branch(lir_cond_always, slow->continuation());
+
+
+
+  // __ branch_destination(prefetch_done->label());
+  // __ jump(prefetch_done->label());
+
+
+
   // LIR_Opr tmp1 = gen->new_register(T_ADDRESS);
   // LIR_Opr tmp2 = gen->new_register(T_ADDRESS);
 
   LIR_Opr thrd = gen->getThreadPointer();
-  // LIR_Address* active_flag_addr =
-  //   new LIR_Address(thrd,
-  //                   in_bytes(ShenandoahThreadLocalData::gc_state_offset()),
-  //                   T_BYTE);
-  // // Read and check the gc-state-flag.
-  // LIR_Opr flag_val = gen->new_register(T_INT);
-  // __ load(active_flag_addr, flag_val);
-  // int flags = ShenandoahHeap::HAS_FORWARDED;
-  // if (!ShenandoahBarrierSet::is_strong_access(decorators)) {
-  //   flags |= ShenandoahHeap::WEAK_ROOTS;
-  // }
-  // LIR_Opr mask = LIR_OprFact::intConst(flags);
-  // LIR_Opr mask_reg = gen->new_register(T_INT);
-  // __ move(mask, mask_reg);
 
-  // if (two_operand_lir_form) {
-  //   __ logical_and(flag_val, mask_reg, flag_val);
-  // } else {
-  //   LIR_Opr masked_flag = gen->new_register(T_INT);
-  //   __ logical_and(flag_val, mask_reg, masked_flag);
-  //   flag_val = masked_flag;
-  // }
-  // __ cmp(lir_cond_notEqual, flag_val, LIR_OprFact::intConst(0));
+  // First we test whether marking is in progress.
+  BasicType flag_type;
+  if (in_bytes(SATBMarkQueue::byte_width_of_active()) == 4) {
+    flag_type = T_INT;
+  } else {
+    guarantee(in_bytes(SATBMarkQueue::byte_width_of_active()) == 1,
+              "Assumption");
+    // Use unsigned type T_BOOLEAN here rather than signed T_BYTE since some platforms, eg. ARM,
+    // need to use unsigned instructions to use the large offset to load the satb_mark_queue.
+    flag_type = T_BOOLEAN;
+  }
+  LIR_Address* mark_active_flag_addr =
+    new LIR_Address(thrd,
+                    in_bytes(G1ThreadLocalData::satb_mark_queue_active_offset()),
+                    flag_type);
+  // Read the marking-in-progress flag.
+  // Note: When loading pre_val requires patching, i.e. do_load == true &&
+  // patch == true, a safepoint can occur while patching. This makes the
+  // pre-barrier non-atomic and invalidates the marking-in-progress check.
+  // Therefore, in the presence of patching, we must repeat the same
+  // marking-in-progress checking before calling into the Runtime. For
+  // simplicity, we do this check unconditionally (regardless of the presence
+  // of patching) in the runtime stub
+  // (G1BarrierSetAssembler::generate_c1_pre_barrier_runtime_stub).
+  LIR_Opr flag_val = gen->new_register(T_INT);
+  __ load(mark_active_flag_addr, flag_val);
+  __ cmp(lir_cond_notEqual, flag_val, LIR_OprFact::intConst(0));
 
-  // CodeStub* slow = new ShenandoahLoadReferenceBarrierStub(obj, addr, result, tmp1, tmp2, decorators);
-  // __ branch(lir_cond_notEqual, slow);
-  // __ branch_destination(slow->continuation());
+
+  CodeStub* slow;
+
+  slow = new G1PrefetchBarrierStub(obj);
+
+  __ branch(lir_cond_notEqual, slow);
+  __ branch_destination(slow->continuation());
 
   return result;
 }
@@ -287,11 +318,23 @@ class C1G1PostBarrierCodeGenClosure : public StubAssemblerCodeGenClosure {
   }
 };
 
+class C1G1PrefetchBarrierCodeGenClosure : public StubAssemblerCodeGenClosure {
+  virtual OopMapSet* generate_code(StubAssembler* sasm) {
+    G1BarrierSetAssembler* bs = (G1BarrierSetAssembler*)BarrierSet::barrier_set()->barrier_set_assembler();
+    bs->generate_c1_prefetch_barrier_runtime_stub(sasm);
+    return nullptr;
+  }
+};
+
 void G1BarrierSetC1::generate_c1_runtime_stubs(BufferBlob* buffer_blob) {
   C1G1PreBarrierCodeGenClosure pre_code_gen_cl;
   C1G1PostBarrierCodeGenClosure post_code_gen_cl;
+  C1G1PrefetchBarrierCodeGenClosure prefetch_code_gen_cl;
+
   _pre_barrier_c1_runtime_code_blob = Runtime1::generate_blob(buffer_blob, -1, "g1_pre_barrier_slow",
                                                               false, &pre_code_gen_cl);
   _post_barrier_c1_runtime_code_blob = Runtime1::generate_blob(buffer_blob, -1, "g1_post_barrier_slow",
                                                                false, &post_code_gen_cl);
+  _prefetch_barrier_c1_runtime_code_blob = Runtime1::generate_blob(buffer_blob, -1, "g1_prefetch_barrier_slow",
+                                                               false, &prefetch_code_gen_cl);
 }
