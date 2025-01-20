@@ -1534,6 +1534,7 @@ void os::dump_current_thread_majflt_minflt_and_cputime(const char *prefix) {
   pid_t tid;
   char proc_name[64];
   long majflt, minflt, user_time, sys_time;
+  ResourceMark rm;
 
   for (JavaThreadIteratorWithHandle jtiwh; JavaThread *jt = jtiwh.next(); ) {
     tid = jt->osthread()->thread_id();

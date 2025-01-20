@@ -156,7 +156,11 @@ void G1BarrierSet::on_thread_attach(Thread* thread) {
   // set the active field of the SATB queue to true.  That involves
   // copying the global is_active value to this thread's queue.
   satbq.set_active(_satb_mark_queue_set.is_active());
-  G1ThreadLocalData::prefetch_queue(thread).set_active(_satb_mark_queue_set.is_active()); //hua: todo modify
+
+  PrefetchQueue& pq = G1ThreadLocalData::prefetch_queue(thread);
+
+  PrefetchQueueSet& pq_set = G1CollectedHeap::heap()->prefetch_queue_set();
+  pq.set_active(pq_set.is_active()); //hua: todo modify
 }
 
 void G1BarrierSet::on_thread_detach(Thread* thread) {
@@ -165,6 +169,9 @@ void G1BarrierSet::on_thread_detach(Thread* thread) {
   {
     SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
     G1BarrierSet::satb_mark_queue_set().flush_queue(queue);
+
+    PrefetchQueue& pq = G1ThreadLocalData::prefetch_queue(thread);
+    pq.abandon_buffer();
   }
   {
     G1DirtyCardQueue& queue = G1ThreadLocalData::dirty_card_queue(thread);

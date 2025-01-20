@@ -228,7 +228,7 @@ protected:
   ~PtrQueueSet();
 
   // Discard any buffered enqueued data.
-  void reset_queue(PtrQueue& queue);
+  virtual void reset_queue(PtrQueue& queue);
 
   // If queue has any buffered enqueued data, transfer it to this qset.
   // Otherwise, deallocate queue's buffer.

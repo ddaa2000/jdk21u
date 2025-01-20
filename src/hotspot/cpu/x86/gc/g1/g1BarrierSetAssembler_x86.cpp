@@ -227,7 +227,7 @@ void G1BarrierSetAssembler::oop_load_at(MacroAssembler* masm, DecoratorSet decor
                          tmp1 /* obj */,
                          rthread /* thread */,
                          tmp2,
-                         false);
+                         true);
     __ pop(tmp2);
     __ pop(tmp1);
   }

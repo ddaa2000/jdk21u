@@ -816,15 +816,17 @@ void G1ConcurrentMark::post_concurrent_mark_start() {
   rp->start_discovery(false /* always_clear */);
 
   SATBMarkQueueSet& satb_mq_set = G1BarrierSet::satb_mark_queue_set();
+  PrefetchQueueSet& prefetch_mq_set = _g1h->prefetch_queue_set();
+
   // This is the start of  the marking cycle, we're expected all
   // threads to have SATB queues with active set to false.
+  prefetch_mq_set.abandon_partial_marking();
+
   satb_mq_set.set_active_all_threads(true, /* new active value */
                                      false /* expected_active */);
 
   //hua: todo check whether other states are synced with satb
   // Haoran: modify
-  PrefetchQueueSet& prefetch_mq_set = _g1h->prefetch_queue_set();
-  prefetch_mq_set.abandon_partial_marking();
   prefetch_mq_set.set_active_all_threads(true, /* new active value */
                     false /* expected_active */);
 
@@ -2078,12 +2080,12 @@ bool G1ConcurrentMark::concurrent_cycle_abort() {
   
   // Haoran: modify
   G1PrefetchQueueSet& pq_set = G1CollectedHeap::heap()->prefetch_queue_set();
-  pq_set.abandon_partial_marking();
+  // pq_set.abandon_partial_marking();
   // This can be called either during or outside marking, we'll read
   // the expected_active value from the SATB queue set.
   pq_set.set_active_all_threads(
                                  false, /* new active value */
-                                 satb_mq_set.is_active() /* expected_active */);
+                                 pq_set.is_active() /* expected_active */);
   pq_set.abandon_partial_marking();
 
   return true;

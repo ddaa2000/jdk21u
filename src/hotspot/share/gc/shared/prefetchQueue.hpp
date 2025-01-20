@@ -72,6 +72,7 @@ public:
 
   bool is_active() const { return _active; }
   void set_active(bool value) { _active = value; }
+  void abandon_buffer();
 
   bool set_in_processing() {
     if(_in_processing == true) return false;
@@ -156,7 +157,7 @@ public:
     assert(index() == 0, "precondition");
     // This thread records the full buffer and allocates a new one (while
     // holding the lock if there is one).
-    if (_buf != NULL) {
+    if (_buf != nullptr) {
       // Two-fingered compaction toward the end.
       size_t remaining_objs = MIN2(prefetch_queue_threshold(), tail()-index());
       void** src = &_buf[index()];
@@ -197,6 +198,11 @@ public:
     //     return false;
     // }
     MutexLocker z(&_m, Mutex::_no_safepoint_check_flag);
+    if ( _buf == nullptr) {
+      *ptrptr = nullptr;
+      return false;
+    }
+
     size_t current_index = index();
     size_t current_tail = tail(); 
     if (current_tail < current_index){
@@ -205,7 +211,7 @@ public:
     }
 
     if(current_tail == current_index) {
-      *ptrptr = NULL;
+      *ptrptr = nullptr;
 
       // _in_dequeue = false;
       return false;
@@ -309,6 +315,8 @@ public:
 
   // If a marking is being abandoned, reset any unprocessed log buffers.
   void abandon_partial_marking();
+  virtual void reset_queue(PtrQueue& queue);
+
 };
 
 inline void PrefetchQueue::filter() {

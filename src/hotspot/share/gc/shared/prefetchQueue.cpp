@@ -46,17 +46,26 @@ PrefetchQueue::PrefetchQueue(PrefetchQueueSet* qset, bool permanent) :
   // PtrQueue(qset, permanent, false /* active */),
   PtrQueue(qset),
   // _m(Mutex::leaf, FormatBuffer<128>("PrefetchQueue"), true, Monitor::_safepoint_check_never),
-  _m(Mutex::nosafepoint, "PrefetchQueue", true),
+  _m(Mutex::nosafepoint-2, "PrefetchQueue", true),
   _in_processing(false),
   _qset(qset)
 { }
 
 PrefetchQueue::~PrefetchQueue() {
   //hua: todo remove later?
-  if(_buf!=NULL){
+  // if(_buf!=NULL){
+  //   BufferNode* node = BufferNode::make_node_from_buffer(_buf, index());
+  //   _qset->deallocate_buffer(node);
+  //   _buf=NULL;
+  // }
+}
+
+void PrefetchQueue::abandon_buffer() {
+  MutexLocker z(&_m, Mutex::_no_safepoint_check_flag);
+  if(_buf!=nullptr){
     BufferNode* node = BufferNode::make_node_from_buffer(_buf, index());
     _qset->deallocate_buffer(node);
-    _buf=NULL;
+    _buf=nullptr;
   }
 }
 
@@ -334,3 +343,11 @@ void PrefetchQueueSet::abandon_completed_buffers() {
 //   }
 //   // shared_prefetch_queue()->reset();
 // }
+
+void PrefetchQueueSet::reset_queue(PtrQueue& queue){
+  MutexLocker z(&(((PrefetchQueue&)queue)._m), Mutex::_no_safepoint_check_flag);
+  if (queue.buffer() != nullptr) {
+    queue.set_index(buffer_size());
+    queue.set_tail(buffer_size());
+  }
+}
