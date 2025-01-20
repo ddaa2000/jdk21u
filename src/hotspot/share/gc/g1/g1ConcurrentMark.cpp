@@ -2427,7 +2427,7 @@ void G1CMTask::drain_local_queue(bool partially) {
         _count_local_queue_page_remote += 1;
       }
 
-      if(has_pushed_back || page_likely_local) {
+      if(has_pushed_back || page_likely_local || true) {
         _count_scan += 1;
         G1TaskQueueEntry clean_entry;
         if(entry.is_array_slice()){
