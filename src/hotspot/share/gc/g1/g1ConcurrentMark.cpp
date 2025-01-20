@@ -824,6 +824,7 @@ void G1ConcurrentMark::post_concurrent_mark_start() {
   //hua: todo check whether other states are synced with satb
   // Haoran: modify
   PrefetchQueueSet& prefetch_mq_set = _g1h->prefetch_queue_set();
+  prefetch_mq_set.abandon_partial_marking();
   prefetch_mq_set.set_active_all_threads(true, /* new active value */
                     false /* expected_active */);
 
@@ -1312,6 +1313,7 @@ void G1ConcurrentMark::remark() {
     // threads to have SATB queues with active set to true.
     prefetch_mq_set.set_active_all_threads(false, /* new active value */
                     true /* expected_active */);
+    prefetch_mq_set.abandon_partial_marking();
 
 
     {
@@ -2082,6 +2084,7 @@ bool G1ConcurrentMark::concurrent_cycle_abort() {
   pq_set.set_active_all_threads(
                                  false, /* new active value */
                                  satb_mq_set.is_active() /* expected_active */);
+  pq_set.abandon_partial_marking();
 
   return true;
 }

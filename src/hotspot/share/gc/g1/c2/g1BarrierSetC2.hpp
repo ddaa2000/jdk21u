@@ -53,6 +53,10 @@ protected:
                             Node* val,
                             BasicType bt,
                             bool use_precise) const;
+  
+  virtual Node* prefetch_load_barrier(GraphKit* kit,
+                          Node* ctl,
+                          Node* obj) const;
 
   bool g1_can_remove_pre_barrier(GraphKit* kit,
                                  PhaseValues* phase,

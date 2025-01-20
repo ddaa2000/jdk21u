@@ -882,50 +882,50 @@ void G1BarrierSetAssembler::generate_c1_prefetch_barrier_runtime_stub(StubAssemb
   // At this point we know new_value is non-null and the new_value crosses regions.
   // Must check to see if card is already dirty
 
-  // const Register thread = NOT_LP64(rax) LP64_ONLY(r15_thread);
+  const Register thread = NOT_LP64(rax) LP64_ONLY(r15_thread);
 
-  // Address prefetch_queue_active(thread, in_bytes(G1ThreadLocalData::prefetch_queue_active_offset()));
-  // Address prefetch_queue_index(thread, in_bytes(G1ThreadLocalData::prefetch_queue_index_offset()));
-  // Address prefetch_buffer(thread, in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset()));
+  Address prefetch_queue_active(thread, in_bytes(G1ThreadLocalData::prefetch_queue_active_offset()));
+  Address prefetch_queue_index(thread, in_bytes(G1ThreadLocalData::prefetch_queue_index_offset()));
+  Address prefetch_buffer(thread, in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset()));
 
 
-  // //Haoran:modify
-  // __ push(rax);
-  // const Register obj = rax;
-  // __ load_parameter(0, obj);
-  // Label prefetch_done;
-  // Label prefetch_runtime;
+  //Haoran:modify
+  __ push(rax);
+  const Register obj = rax;
+  __ load_parameter(0, obj);
+  Label prefetch_done;
+  Label prefetch_runtime;
 
-  // __ push(rcx);
-  // const Register tmp2 = rcx;
+  __ push(rcx);
+  const Register tmp2 = rcx;
 
-  // if (in_bytes(PrefetchQueue::byte_width_of_active()) == 4) {
-  //   __ cmpl(prefetch_queue_active, 0);
-  // } else {
-  //   assert(in_bytes(PrefetchQueue::byte_width_of_active()) == 1, "Assumption");
-  //   __ cmpb(prefetch_queue_active, 0);
-  // }
-  // __ jcc(Assembler::equal, prefetch_done);
+  if (in_bytes(PrefetchQueue::byte_width_of_active()) == 4) {
+    __ cmpl(prefetch_queue_active, 0);
+  } else {
+    assert(in_bytes(PrefetchQueue::byte_width_of_active()) == 1, "Assumption");
+    __ cmpb(prefetch_queue_active, 0);
+  }
+  __ jcc(Assembler::equal, prefetch_done);
 
-  // __ movptr(tmp2, prefetch_queue_index);
-  // __ testptr(tmp2, tmp2);
-  // __ jcc(Assembler::zero, prefetch_runtime);
-  // __ subptr(tmp2, wordSize);
-  // __ movptr(prefetch_queue_index, tmp2);
-  // __ addptr(tmp2, prefetch_buffer);
-  // __ movptr(Address(tmp2, 0), obj);
-  // __ jmp(prefetch_done);
+  __ movptr(tmp2, prefetch_queue_index);
+  __ testptr(tmp2, tmp2);
+  __ jcc(Assembler::zero, prefetch_runtime);
+  __ subptr(tmp2, wordSize);
+  __ movptr(prefetch_queue_index, tmp2);
+  __ addptr(tmp2, prefetch_buffer);
+  __ movptr(Address(tmp2, 0), obj);
+  __ jmp(prefetch_done);
 
-  // __ bind(prefetch_runtime);
-  // __ save_live_registers_no_oop_map(true);
-  // __ load_parameter(0, rcx);
-  // __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
-  // __ restore_live_registers(true);
-  // __ bind(prefetch_done);
+  __ bind(prefetch_runtime);
+  __ save_live_registers_no_oop_map(true);
+  __ load_parameter(0, rcx);
+  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
+  __ restore_live_registers(true);
+  __ bind(prefetch_done);
 
-  // __ movptr(tmp2, Address(obj,0));
-  // __ pop(rcx);
-  // __ pop(rax);
+  __ movptr(tmp2, Address(obj,0));
+  __ pop(rcx);
+  __ pop(rax);
 
 // ----------------------------------------prefetch done -------------------------
 

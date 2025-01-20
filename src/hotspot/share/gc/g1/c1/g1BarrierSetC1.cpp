@@ -240,24 +240,7 @@ LIR_Opr G1BarrierSetC1::prefetch_load_barrier(LIRGenerator* gen, LIR_Opr obj, LI
   addr = ensure_in_register(gen, addr, T_ADDRESS);
   assert(addr->is_register(), "must be a register at this point");
   LIR_Opr result = gen->result_register_for(obj->value_type());
-  // LabelObj *prefetch_done;
-  // prefetch_done = new LabelObj();
-
   __ move(obj, result);
-  // __ cmp(lir_cond_equal, obj, LIR_OprFact::oopConst(nullptr));
-  // __ branch(lir_cond_equal, prefetch_done->label());
-  
-
-  // __ branch(lir_cond_always, prefetch_done->label());
-  // __ branch(lir_cond_always, slow->continuation());
-
-
-
-  // __ branch_destination(prefetch_done->label());
-  // __ jump(prefetch_done->label());
-
-
-
   // LIR_Opr tmp1 = gen->new_register(T_ADDRESS);
   // LIR_Opr tmp2 = gen->new_register(T_ADDRESS);
 

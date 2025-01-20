@@ -366,7 +366,7 @@ public:
             // while (ret && ptr != NULL && _cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted()) {
             while (ret && ptr != NULL) {
               //hua: todo continue?
-              if(g1h->is_in_reserved(ptr)) break;
+              if(!g1h->is_in_reserved(ptr)) break;
               if(discard_entry(ptr, g1h)){ 
                 ret = prefetch_queue->dequeue(&ptr);
                 continue;
