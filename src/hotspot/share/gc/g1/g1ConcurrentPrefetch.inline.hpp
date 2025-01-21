@@ -218,7 +218,7 @@ inline bool G1PFTask::is_below_global_finger(oop obj) const {
   // of checking both vs only checking the global finger is that the
   // local check will be more accurate and so result in fewer pushes,
   // but may also be a little slower.
-  return _pf->is_below_global_finger();
+  return _pf->is_below_global_finger(obj);
   // HeapWord* global_finger = _cm->finger();
   // HeapWord* objAddr = cast_from_oop<HeapWord*>(obj);
   // return objAddr < global_finger;

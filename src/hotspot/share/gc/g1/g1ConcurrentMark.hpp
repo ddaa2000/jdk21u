@@ -634,6 +634,8 @@ public:
   inline bool mark_in_bitmap(uint worker_id, oop const obj);
 
   inline bool is_marked_in_bitmap(oop p) const;
+  inline bool is_marked_in_black_bitmap(oop p) const;
+
 
   ConcurrentGCTimer* gc_timer_cm() const { return _gc_timer_cm; }
 

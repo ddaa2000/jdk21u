@@ -96,7 +96,7 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
     _task->_count_bitmap_page_remote += 1;
   }
 
-  if(!is_marked_in_black_bitmap(cast_to_oop(addr))){
+  if(!_cm->is_marked_in_black_bitmap(cast_to_oop(addr))){
     _task->scan_task_entry(G1TaskQueueEntry::from_oop(cast_to_oop(addr)));
     // we only partially drain the local queue and global stack
     _task->drain_local_queue(true);
