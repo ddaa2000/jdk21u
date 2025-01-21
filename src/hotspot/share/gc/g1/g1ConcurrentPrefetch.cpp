@@ -371,7 +371,9 @@ public:
                 ret = prefetch_queue->dequeue(&ptr);
                 continue;
               }
-              bool success = task->make_reference_grey(cast_to_oop(ptr));
+              // bool success = task->make_reference_grey(cast_to_oop(ptr));
+              bool success = task->make_reference_black(cast_to_oop(ptr));
+
               if(success) {
                 // log_debug(prefetch)("Succesfully mark one in PFTask!");
               }

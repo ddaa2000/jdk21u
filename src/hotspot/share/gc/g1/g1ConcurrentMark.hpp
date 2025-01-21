@@ -311,6 +311,7 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
 
   // Concurrent marking support structures
   G1CMBitMap              _mark_bitmap;
+  G1CMBitMap              _mark_black_bitmap;
 
   // Heap bounds
   MemRegion const         _heap;
@@ -550,6 +551,8 @@ public:
   G1ConcurrentMarkThread* cm_thread() { return _cm_thread; }
 
   G1CMBitMap* mark_bitmap() const { return (G1CMBitMap*)&_mark_bitmap; }
+  G1CMBitMap* mark_black_bitmap() const { return (G1CMBitMap*)&_mark_black_bitmap; }
+
 
   // Calculates the number of concurrent GC threads to be used in the marking phase.
   uint calc_active_marking_workers();
@@ -602,6 +605,8 @@ public:
   // Mark in the marking bitmap. Used during evacuation failure to
   // remember what objects need handling. Not for use during marking.
   inline void raw_mark_in_bitmap(oop obj);
+  inline bool raw_mark_in_black_bitmap(oop obj);
+
 
   // Clears marks for all objects in the given region in the marking
   // bitmap. This should only be used to clean the bitmap during a

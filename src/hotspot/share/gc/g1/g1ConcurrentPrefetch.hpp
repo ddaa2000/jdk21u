@@ -414,6 +414,10 @@ public:
   inline bool mark_in_bitmap(uint worker_id, HeapRegion* const hr, oop const obj);
   inline bool mark_in_bitmap(uint worker_id, oop const obj);
 
+  inline bool mark_black_in_bitmap(uint const worker_id, oop const obj);
+
+  inline bool is_below_global_finger(oop obj) const;
+
   // inline bool is_marked_in_next_bitmap(oop p) const;
 
 //   // Returns true if initialization was successfully completed.
@@ -615,6 +619,8 @@ public:
   // the local queue if below the finger. obj is required to be below its region's NTAMS.
   // Returns whether there has been a mark to the bitmap.
   inline bool make_reference_grey(oop obj);
+  inline bool make_reference_black(oop obj);
+
 
   // Grey the object (by calling make_grey_reference) if required,
   // e.g. obj is below its containing region's NTAMS.
@@ -680,6 +686,8 @@ public:
       _count_local_queue_page_local, _count_local_queue_page_remote
     );
   }
+
+  inline bool is_below_global_finger(oop obj) const;
 
 };
 

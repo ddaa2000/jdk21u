@@ -274,9 +274,20 @@ inline void G1ConcurrentMark::raw_mark_in_bitmap(oop obj) {
   _mark_bitmap.par_mark(obj);
 }
 
+inline bool G1ConcurrentMark::raw_mark_in_black_bitmap(oop obj) {
+  assert(is_marked_in_bitmap(obj), "the black mark should always come after the grey mark");
+  return _mark_black_bitmap.par_mark(obj);
+}
+
+
 bool G1ConcurrentMark::is_marked_in_bitmap(oop p) const {
   assert(p != nullptr && oopDesc::is_oop(p), "expected an oop");
   return _mark_bitmap.is_marked(cast_from_oop<HeapWord*>(p));
+}
+
+bool G1ConcurrentMark::is_marked_in_black_bitmap(oop p) const {
+  assert(p != nullptr && oopDesc::is_oop(p), "expected an oop");
+  return _mark_black_bitmap.is_marked(cast_from_oop<HeapWord*>(p));
 }
 
 inline bool G1ConcurrentMark::do_yield_check() {
