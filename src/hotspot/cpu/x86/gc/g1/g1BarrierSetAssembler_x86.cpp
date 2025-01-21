@@ -371,13 +371,18 @@ void G1BarrierSetAssembler::g1_prefetch_load_barrier_pre_work(MacroAssembler* ma
   __ cmpptr(obj, NULL_WORD);
   __ jcc(Assembler::equal, *prefetch_done);
 
+  // __ jmp(*prefetch_runtime);
+
+
+ //hua: todo optimize
   __ movptr(tmp, prefetch_queue_index);
   __ testptr(tmp, tmp);
   __ jcc(Assembler::zero, *prefetch_runtime);
   __ subptr(tmp, wordSize);
-  __ movptr(prefetch_queue_index, tmp);
   __ addptr(tmp, prefetch_buffer);
   __ movptr(Address(tmp, 0), obj);
+  __ subptr(tmp, prefetch_buffer);
+  __ movptr(prefetch_queue_index, tmp);
   __ jmp(*prefetch_done);
 
 // ----------------------------------------prefetch done -------------------------
@@ -773,13 +778,17 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
   }
   __ jcc(Assembler::equal, prefetch_done);
 
+  // __ jmp(prefetch_runtime); //hua: debugging memory ordering
+
+
   __ movptr(tmp2, prefetch_queue_index);
   __ testptr(tmp2, tmp2);
   __ jcc(Assembler::zero, prefetch_runtime);
   __ subptr(tmp2, wordSize);
-  __ movptr(prefetch_queue_index, tmp2);
   __ addptr(tmp2, prefetch_buffer);
   __ movptr(Address(tmp2, 0), new_val);
+  __ subptr(tmp2, prefetch_buffer);
+  __ movptr(prefetch_queue_index, tmp2);
 
   __ jmp(prefetch_done);
   __ bind(prefetch_runtime);
@@ -907,13 +916,17 @@ void G1BarrierSetAssembler::generate_c1_prefetch_barrier_runtime_stub(StubAssemb
   }
   __ jcc(Assembler::equal, prefetch_done);
 
+  // __ jmp(prefetch_runtime); //hua: debugging memory ordering
+
+
   __ movptr(tmp2, prefetch_queue_index);
   __ testptr(tmp2, tmp2);
   __ jcc(Assembler::zero, prefetch_runtime);
   __ subptr(tmp2, wordSize);
-  __ movptr(prefetch_queue_index, tmp2);
   __ addptr(tmp2, prefetch_buffer);
   __ movptr(Address(tmp2, 0), obj);
+  __ subptr(tmp2, prefetch_buffer);
+  __ movptr(prefetch_queue_index, tmp2);
   __ jmp(prefetch_done);
 
   __ bind(prefetch_runtime);

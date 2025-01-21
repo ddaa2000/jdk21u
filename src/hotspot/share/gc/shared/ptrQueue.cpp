@@ -107,6 +107,7 @@ bool PtrQueueSet::try_enqueue(PtrQueue& queue, void* value) {
   void** buffer = queue.buffer();
   assert(buffer != nullptr, "no buffer but non-zero index");
   buffer[--index] = value;
+  OrderAccess::storestore();
   queue.set_index(index);
   return true;
 }
@@ -116,6 +117,7 @@ void PtrQueueSet::retry_enqueue(PtrQueue& queue, void* value) {
   assert(queue.buffer() != nullptr, "precondition");
   size_t index = queue.index();
   queue.buffer()[--index] = value;
+  OrderAccess::storestore();
   queue.set_index(index);
 }
 
