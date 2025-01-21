@@ -511,6 +511,8 @@ void G1ConcurrentMark::humongous_object_eagerly_reclaimed(HeapRegion* r) {
 
   // Need to clear mark bit of the humongous object. Doing this unconditionally is fine.
   mark_bitmap()->clear(r->bottom());
+  mark_black_bitmap()->clear(r->bottom());
+
 
   if (!_g1h->collector_state()->mark_or_rebuild_in_progress()) {
     return;
@@ -594,6 +596,8 @@ private:
   private:
     G1ConcurrentMark* _cm;
     G1CMBitMap* _bitmap;
+    G1CMBitMap* _bitmap_black;
+
     bool _suspendible; // If suspendible, do yield checks.
 
     bool suspendible() {
@@ -633,6 +637,7 @@ private:
       HeapRegionClosure(),
       _cm(cm),
       _bitmap(cm->mark_bitmap()),
+      _bitmap_black(cm->mark_black_bitmap()),
       _suspendible(suspendible)
     { }
 
@@ -650,6 +655,8 @@ private:
 
         MemRegion mr(cur, MIN2(cur + chunk_size_in_words, end));
         _bitmap->clear_range(mr);
+        _bitmap_black->clear_range(mr);
+
 
         cur += chunk_size_in_words;
 
