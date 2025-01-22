@@ -50,6 +50,7 @@ G1RegionToSpaceMapper::G1RegionToSpaceMapper(ReservedSpace rs,
   guarantee(is_power_of_2(region_granularity), "must be");
 
   MemTracker::record_virtual_memory_type((address)rs.base(), type);
+  log_info(gc)("create mapper");
 }
 
 // Used to manually signal a mapper to handle a set of regions as committed.
@@ -256,9 +257,17 @@ class G1RegionsSmallerThanCommitSizeMapper : public G1RegionToSpaceMapper {
 void G1RegionToSpaceMapper::fire_on_commit(uint start_idx, size_t num_regions, bool zero_filled) {
   if (_listener != nullptr) {
     _listener->on_commit(start_idx, num_regions, zero_filled);
+    log_info(gc)("on commit grey");
+  } else {
+    log_info(gc)("on commit grey empty");
+
   }
+
   if (_listener_black != nullptr){
     _listener_black->on_commit(start_idx, num_regions, zero_filled);
+    log_info(gc)("on commit black");
+  } else {
+    log_info(gc)("on commit black empty");
   }
 }
 

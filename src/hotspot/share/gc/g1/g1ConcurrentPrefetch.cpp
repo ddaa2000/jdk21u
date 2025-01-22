@@ -510,6 +510,7 @@ void G1PFTask::move_entries_to_global_stack() {
   size_t n = 0;
   G1TaskQueueEntry task_entry;
   while (n < G1CMMarkStack::EntriesPerChunk && _task_queue->pop_local(task_entry)) {
+    // ShouldNotReachHere();
     buffer[n] = task_entry;
     ++n;
   }

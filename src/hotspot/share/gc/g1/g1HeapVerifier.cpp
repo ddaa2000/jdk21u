@@ -459,9 +459,9 @@ void G1HeapVerifier::verify_after_gc() {
 }
 
 void G1HeapVerifier::verify_bitmap_clear(bool from_tams) {
-  if (!G1VerifyBitmaps) {
-    return;
-  }
+  // if (!G1VerifyBitmaps) {
+  //   return;
+  // }
 
   class G1VerifyBitmapClear : public HeapRegionClosure {
     bool _from_tams;
@@ -470,12 +470,30 @@ void G1HeapVerifier::verify_bitmap_clear(bool from_tams) {
     G1VerifyBitmapClear(bool from_tams) : _from_tams(from_tams) { }
 
     virtual bool do_heap_region(HeapRegion* r) {
-      G1CMBitMap* bitmap = G1CollectedHeap::heap()->concurrent_mark()->mark_bitmap();
+      {
+        G1CMBitMap* bitmap = G1CollectedHeap::heap()->concurrent_mark()->mark_bitmap();
 
-      HeapWord* start = _from_tams ? r->top_at_mark_start() : r->bottom();
+        HeapWord* start = _from_tams ? r->top_at_mark_start() : r->bottom();
 
-      HeapWord* mark = bitmap->get_next_marked_addr(start, r->end());
-      guarantee(mark == r->end(), "Found mark at " PTR_FORMAT " in region %u from start " PTR_FORMAT, p2i(mark), r->hrm_index(), p2i(start));
+        HeapWord* mark = bitmap->get_next_marked_addr(start, r->end());
+        if(mark != r->end()){
+          ShouldNotReachHere();
+        }
+        guarantee(mark == r->end(), "Found mark at " PTR_FORMAT " in region %u from start " PTR_FORMAT, p2i(mark), r->hrm_index(), p2i(start));
+      }
+
+      {
+        G1CMBitMap* bitmap = G1CollectedHeap::heap()->concurrent_mark()->mark_black_bitmap();
+
+        HeapWord* start = _from_tams ? r->top_at_mark_start() : r->bottom();
+
+        HeapWord* mark = bitmap->get_next_marked_addr(start, r->end());
+        if(mark != r->end()){
+          ShouldNotReachHere();
+        }
+        guarantee(mark == r->end(), "Found mark at " PTR_FORMAT " in region %u from start " PTR_FORMAT, p2i(mark), r->hrm_index(), p2i(start));
+      }
+
       return false;
     }
   } cl(from_tams);

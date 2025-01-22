@@ -101,6 +101,8 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
     // we only partially drain the local queue and global stack
     _task->drain_local_queue(true);
     _task->drain_global_stack(true);
+  } else {
+    ShouldNotReachHere();
   }
 
 

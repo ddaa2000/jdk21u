@@ -28,6 +28,7 @@
 #include "gc/g1/g1PageBasedVirtualSpace.hpp"
 #include "memory/allocation.hpp"
 #include "utilities/debug.hpp"
+#include "logging/log.hpp"
 
 class WorkerThreads;
 
@@ -64,8 +65,8 @@ class G1RegionToSpaceMapper : public CHeapObj<mtGC> {
   size_t reserved_size() { return _storage.reserved_size(); }
   size_t committed_size() { return _storage.committed_size(); }
 
-  void set_mapping_changed_listener(G1MappingChangedListener* listener) { _listener = listener; }
-  void set_mapping_changed_listener_black(G1MappingChangedListener* listener) { _listener_black = listener; }
+  void set_mapping_changed_listener(G1MappingChangedListener* listener) { log_info(gc)("set grey listener"); _listener = listener; }
+  void set_mapping_changed_listener_black(G1MappingChangedListener* listener) { log_info(gc)("set black listener"); _listener_black = listener; }
 
 
   void signal_mapping_changed(uint start_idx, size_t num_regions);

@@ -39,6 +39,7 @@ void G1CMBitMap::initialize(MemRegion heap, G1RegionToSpaceMapper* storage, bool
   } else {
     storage->set_mapping_changed_listener(&_listener);
   }
+  log_info(gc)("initialize g1 cm bitmap");
 }
 
 void G1CMBitMapMappingChangedListener::on_commit(uint start_region, size_t num_regions, bool zero_filled) {
