@@ -188,7 +188,7 @@ inline void G1PFTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       } else {
         _words_scanned += obj->oop_iterate_size(_cm_oop_closure);
         _objs_scanned ++;
-        // bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+        bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
       }
     }
   } 

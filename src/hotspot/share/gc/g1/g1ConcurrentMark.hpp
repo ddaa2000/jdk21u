@@ -545,7 +545,8 @@ public:
   bool try_stealing(uint worker_id, G1TaskQueueEntry& task_entry);
 
   G1ConcurrentMark(G1CollectedHeap* g1h,
-                   G1RegionToSpaceMapper* bitmap_storage);
+                   G1RegionToSpaceMapper* bitmap_storage,
+                   G1RegionToSpaceMapper* black_bitmap_storage);
   ~G1ConcurrentMark();
 
   G1ConcurrentMarkThread* cm_thread() { return _cm_thread; }

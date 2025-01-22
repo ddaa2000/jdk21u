@@ -102,7 +102,8 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
     _task->drain_local_queue(true);
     _task->drain_global_stack(true);
   } else {
-    ShouldNotReachHere();
+    // log_info(gc)("ignore black");
+    // ShouldNotReachHere();
   }
 
 
@@ -379,7 +380,8 @@ bool G1CMRootMemRegions::wait_until_scan_finished() {
 }
 
 G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
-                                   G1RegionToSpaceMapper* bitmap_storage) :
+                                   G1RegionToSpaceMapper* bitmap_storage,
+                                   G1RegionToSpaceMapper* black_bitmap_storage) :
   // _cm_thread set inside the constructor
   _g1h(g1h),
 
@@ -435,7 +437,7 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
   assert(CGC_lock != nullptr, "CGC_lock must be initialized");
 
   _mark_bitmap.initialize(g1h->reserved(), bitmap_storage);
-  _mark_black_bitmap.initialize(g1h->reserved(), bitmap_storage, true);
+  _mark_black_bitmap.initialize(g1h->reserved(), black_bitmap_storage);
 
 
   // Create & start ConcurrentMark thread.

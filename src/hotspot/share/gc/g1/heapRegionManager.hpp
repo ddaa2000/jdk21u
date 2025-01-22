@@ -123,6 +123,8 @@ class HeapRegionManager: public CHeapObj<mtGC> {
   G1HeapRegionTable _regions;
   G1RegionToSpaceMapper* _heap_mapper;
   G1RegionToSpaceMapper* _bitmap_mapper;
+  G1RegionToSpaceMapper* _black_bitmap_mapper;
+
   FreeRegionList _free_list;
 
   void expand(uint index, uint num_regions, WorkerThreads* pretouch_workers = nullptr);
@@ -161,6 +163,7 @@ public:
 
   void initialize(G1RegionToSpaceMapper* heap_storage,
                   G1RegionToSpaceMapper* bitmap,
+                  G1RegionToSpaceMapper* black_bitmap,
                   G1RegionToSpaceMapper* bot,
                   G1RegionToSpaceMapper* cardtable);
 

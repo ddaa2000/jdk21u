@@ -1503,8 +1503,11 @@ jint G1CollectedHeap::initialize() {
   size_t bitmap_size = G1CMBitMap::compute_size(heap_rs.size());
   G1RegionToSpaceMapper* bitmap_storage =
     create_aux_memory_mapper("Mark Bitmap", bitmap_size, G1CMBitMap::heap_map_factor());
+  
+  G1RegionToSpaceMapper* black_bitmap_storage =
+    create_aux_memory_mapper("Mark Bitmap", bitmap_size, G1CMBitMap::heap_map_factor());
 
-  _hrm.initialize(heap_storage, bitmap_storage, bot_storage, cardtable_storage);
+  _hrm.initialize(heap_storage, bitmap_storage, black_bitmap_storage, bot_storage, cardtable_storage);
   _card_table->initialize(cardtable_storage);
 
   // 6843694 - ensure that the maximum region index can fit
@@ -1547,7 +1550,7 @@ jint G1CollectedHeap::initialize() {
 
   // Create the G1ConcurrentMark data structure and thread.
   // (Must do this late, so that "max_[reserved_]regions" is defined.)
-  _cm = new G1ConcurrentMark(this, bitmap_storage);
+  _cm = new G1ConcurrentMark(this, bitmap_storage, black_bitmap_storage);
   _cm_thread = _cm->cm_thread();
 
     // Haoran: modify
