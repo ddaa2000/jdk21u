@@ -67,7 +67,7 @@ public:
   G1CMBitMap();
 
   // Initializes the underlying BitMap to cover the given area.
-  void initialize(MemRegion heap, G1RegionToSpaceMapper* storage);
+  void initialize(MemRegion heap, G1RegionToSpaceMapper* storage, bool is_black=false);
 
   // Apply the closure to the addresses that correspond to marked bits in the bitmap.
   inline bool iterate(G1CMBitMapClosure* cl, MemRegion mr);

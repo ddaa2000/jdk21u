@@ -433,7 +433,7 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
   assert(CGC_lock != nullptr, "CGC_lock must be initialized");
 
   _mark_bitmap.initialize(g1h->reserved(), bitmap_storage);
-  _mark_black_bitmap.initialize(g1h->reserved(), bitmap_storage);
+  _mark_black_bitmap.initialize(g1h->reserved(), bitmap_storage, true);
 
 
   // Create & start ConcurrentMark thread.

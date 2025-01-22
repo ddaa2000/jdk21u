@@ -42,6 +42,7 @@ G1RegionToSpaceMapper::G1RegionToSpaceMapper(ReservedSpace rs,
                                              size_t commit_factor,
                                              MEMFLAGS type) :
   _listener(nullptr),
+  _listener_black(nullptr),
   _storage(rs, used_size, page_size),
   _region_commit_map(rs.size() * commit_factor / region_granularity, mtGC),
   _memory_type(type) {
@@ -255,6 +256,9 @@ class G1RegionsSmallerThanCommitSizeMapper : public G1RegionToSpaceMapper {
 void G1RegionToSpaceMapper::fire_on_commit(uint start_idx, size_t num_regions, bool zero_filled) {
   if (_listener != nullptr) {
     _listener->on_commit(start_idx, num_regions, zero_filled);
+  }
+  if (_listener_black != nullptr){
+    _listener_black->on_commit(start_idx, num_regions, zero_filled);
   }
 }
 

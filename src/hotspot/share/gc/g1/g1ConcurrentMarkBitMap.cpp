@@ -32,9 +32,13 @@ G1CMBitMap::G1CMBitMap() : MarkBitMap(), _listener() {
   _listener.set_bitmap(this);
 }
 
-void G1CMBitMap::initialize(MemRegion heap, G1RegionToSpaceMapper* storage) {
+void G1CMBitMap::initialize(MemRegion heap, G1RegionToSpaceMapper* storage, bool is_black) {
   MarkBitMap::initialize(heap, storage->reserved());
-  storage->set_mapping_changed_listener(&_listener);
+  if(is_black){
+    storage->set_mapping_changed_listener_black(&_listener);
+  } else {
+    storage->set_mapping_changed_listener(&_listener);
+  }
 }
 
 void G1CMBitMapMappingChangedListener::on_commit(uint start_region, size_t num_regions, bool zero_filled) {

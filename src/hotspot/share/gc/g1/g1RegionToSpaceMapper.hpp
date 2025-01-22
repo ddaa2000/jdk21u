@@ -45,6 +45,7 @@ class G1MappingChangedListener {
 class G1RegionToSpaceMapper : public CHeapObj<mtGC> {
  private:
   G1MappingChangedListener* _listener;
+  G1MappingChangedListener* _listener_black;
  protected:
   // Backing storage.
   G1PageBasedVirtualSpace _storage;
@@ -64,6 +65,8 @@ class G1RegionToSpaceMapper : public CHeapObj<mtGC> {
   size_t committed_size() { return _storage.committed_size(); }
 
   void set_mapping_changed_listener(G1MappingChangedListener* listener) { _listener = listener; }
+  void set_mapping_changed_listener_black(G1MappingChangedListener* listener) { _listener_black = listener; }
+
 
   void signal_mapping_changed(uint start_idx, size_t num_regions);
 
