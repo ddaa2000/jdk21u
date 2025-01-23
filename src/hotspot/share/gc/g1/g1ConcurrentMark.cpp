@@ -90,13 +90,14 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
   size_t page_id = ((size_t)addr - SEMERU_START_ADDR)/4096;
   bool page_likely_local = G1CollectedHeap::heap()->user_buf->page_stats[page_id] == 0;
 
-  if(page_likely_local){
-    _task->_count_bitmap_page_local += 1;
-  } else {
-    _task->_count_bitmap_page_remote += 1;
-  }
 
   if(!_cm->is_marked_in_black_bitmap(cast_to_oop(addr))){
+    if(page_likely_local){
+      _task->_count_bitmap_page_local += 1;
+    } else {
+      _task->_count_bitmap_page_remote += 1;
+    }
+
     _task->scan_task_entry(G1TaskQueueEntry::from_oop(cast_to_oop(addr)));
     // we only partially drain the local queue and global stack
     _task->drain_local_queue(true);

@@ -362,6 +362,8 @@ public:
           if(get_queue) {
             void* ptr;
             bool ret = prefetch_queue->dequeue(&ptr);
+            // uint pq_acc = 0;
+
             //hua: should be like this:?
             // while (ret && ptr != NULL && _cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted()) {
             while (ret && ptr != NULL) {
@@ -373,12 +375,14 @@ public:
               }
               // bool success = task->make_reference_grey(cast_to_oop(ptr));
               bool success = task->make_reference_black(cast_to_oop(ptr));
+              // pq_acc += 1;
 
-              if(success) {
-                // log_debug(prefetch)("Succesfully mark one in PFTask!");
-              }
+              // if(success) {
+              //   // log_debug(prefetch)("Succesfully mark one in PFTask!");
+              // }
               ret = prefetch_queue->dequeue(&ptr);
             }
+            // log_info(gc)("pq_acc: %u", pq_acc);
             prefetch_queue->release_processing();
             task->do_marking_step();
             _pf->do_yield_check();
@@ -519,6 +523,7 @@ void G1PFTask::move_entries_to_global_stack() {
   }
 
   if (n > 0) {
+    log_info(gc)("prefetcher overflow");
     if (!_cm->mark_stack_push(buffer)) {
       // _cm->set_has_overflown();
       // ShouldNotReachHere();
@@ -547,7 +552,8 @@ void G1PFTask::drain_local_queue(bool partially) {
   //     ret = _task_queue->pop_global(entry);
   //   }
   // }
-  while(_words_scanned < max_size && _objs_scanned < max_num_objects && !_cm->has_aborted() && !has_aborted()) {
+  while(!_cm->has_aborted() && !has_aborted()){
+  // while(_words_scanned < max_size && _objs_scanned < max_num_objects && !_cm->has_aborted() && !has_aborted()) {
     // bool ret = _task_queue->pop_global(entry);
     bool ret = _task_queue->pop_local(entry);
 

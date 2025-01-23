@@ -97,18 +97,20 @@ inline bool G1ConcurrentPrefetch::mark_black_in_bitmap(uint const worker_id, oop
     add_to_liveness(worker_id, obj, obj->size());
   }
 
-  // if (!success && is_below_global_finger(obj)){ // already black
-  //   return false;
-  // }
+  if (!success && is_below_global_finger(obj)){ // already black
+    return false;
+  }
   OrderAccess::storestore();
   // now the object is at least grey
   // if(success){
   //   bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
   // }
-  
-  // return success_black;
+  bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
 
-  return success;
+  
+  return success_black;
+
+  // return success;
 }
 
 // #ifndef PRODUCT
@@ -188,7 +190,7 @@ inline void G1PFTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       } else {
         _words_scanned += obj->oop_iterate_size(_cm_oop_closure);
         _objs_scanned ++;
-        bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+        // bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
       }
     }
   } 
@@ -271,7 +273,7 @@ inline bool G1PFTask::make_reference_grey(oop obj) {
 }
 
 inline bool G1PFTask::make_reference_black(oop obj) {
-  if (!_pf->mark_in_bitmap(_worker_id, obj)) {
+  if (!_pf->mark_black_in_bitmap(_worker_id, obj)) {
     return false;
   }
 
