@@ -97,20 +97,20 @@ inline bool G1ConcurrentPrefetch::mark_black_in_bitmap(uint const worker_id, oop
     add_to_liveness(worker_id, obj, obj->size());
   }
 
-  if (!success && is_below_global_finger(obj)){ // already black
-    return false;
-  }
+  // if (!success && is_below_global_finger(obj)){ // already black
+  //   return false;
+  // }
   OrderAccess::storestore();
   // now the object is at least grey
-  // if(success){
-  //   bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
-  // }
-  bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+  if(success){
+    bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+  }
+  // bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
 
   
-  return success_black;
+  // return success_black;
 
-  // return success;
+  return success;
 }
 
 // #ifndef PRODUCT
