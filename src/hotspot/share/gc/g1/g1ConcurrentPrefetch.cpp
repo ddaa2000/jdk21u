@@ -386,6 +386,22 @@ public:
             prefetch_queue->release_processing();
             task->do_marking_step();
             _pf->do_yield_check();
+          } else {
+            uint steal_count = 0;
+            while (!_cm->has_aborted() && steal_count < 16) {
+              G1TaskQueueEntry entry;
+              if (_cm->try_stealing(_worker_id, entry)) {
+                scan_task_entry(entry);
+
+                // And since we're towards the end, let's totally drain the
+                // local queue and global stack.
+                drain_local_queue(true);
+                drain_global_stack(true);
+              } else {
+                break;
+              }
+              steal_count += 1;
+            }
           }
 
         } while (_cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted());
