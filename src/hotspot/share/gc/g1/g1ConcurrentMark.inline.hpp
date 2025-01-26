@@ -169,6 +169,23 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       _words_scanned += _objArray_processor.process_slice(task_entry.slice());
     } else {
       oop obj = task_entry.obj();
+      
+      size_t size = size_given_klass(k);
+      _size_counter.add(size);
+      size_t start_addr = cast_from_oop<size_t>(entry.obj());
+      size_t end_addr = start_addr + size - 1;
+
+      size_t page_id_start = (start_addr - SEMERU_START_ADDR)/4096;
+      size_t page_id_end = (end_addr - SEMERU_START_ADDR)/4096;
+      for(size_t i = page_id_start; i <= page_id_end; i++){
+        bool page_likely_local = _g1h->user_buf->page_stats[i] == 0;
+        if (page_likely_local){
+          _count_scan_obj_page_local += 1;
+        } else {
+          _count_scan_obj_page_remote += 1;
+        }
+      }
+
       if (G1CMObjArrayProcessor::should_be_sliced(obj)) {
         _words_scanned += _objArray_processor.process_obj(obj);
       } else {

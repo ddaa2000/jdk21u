@@ -90,6 +90,19 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
   size_t page_id = ((size_t)addr - SEMERU_START_ADDR)/4096;
   bool page_likely_local = G1CollectedHeap::heap()->user_buf->page_stats[page_id] == 0;
 
+  if(page_id != _task->_present_page_index){
+    if(_task->_has_black && _task->_has_visited_grey){
+      _task->_count_black_grey += 1;
+    } else if (_task->_has_visited_grey){
+      _task->_count_all_grey += 1;
+    } else if (_task->_has_black){
+      _task->_count_all_black += 1;
+    }
+    _task->_has_visited_grey = false;
+    _task->_has_black = false;
+    _task->_present_page_index = page_id;
+  }
+
 
   if(!_cm->is_marked_in_black_bitmap(cast_to_oop(addr))){
     if(page_likely_local){
@@ -97,12 +110,14 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
     } else {
       _task->_count_bitmap_page_remote += 1;
     }
+    _task->_has_visited_grey = true;
 
     _task->scan_task_entry(G1TaskQueueEntry::from_oop(cast_to_oop(addr)));
     // we only partially drain the local queue and global stack
     _task->drain_local_queue(true);
     _task->drain_global_stack(true);
   } else {
+    _task->_has_black = true;
     // log_info(gc)("ignore black");
     // ShouldNotReachHere();
   }
@@ -935,6 +950,7 @@ public:
       }
       task->record_end_time();
       task->print_memliner_stats();
+      log_info(gc)("CM %u ended", worker_id);
       guarantee(!task->has_aborted() || _cm->has_aborted(), "invariant");
     }
 

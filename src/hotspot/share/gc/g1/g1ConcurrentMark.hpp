@@ -650,6 +650,126 @@ private:
   uint needs_remembered_set_rebuild() const { return _needs_remembered_set_rebuild; }
 };
 
+class ObjSizeCounter {
+  uint64_t _count_64;
+  uint64_t _count_256;
+  uint64_t _count_1KB;
+  uint64_t _count_4KB;
+  uint64_t _count_64KB;
+  uint64_t _count_256KB;
+  uint64_t _count_1MB;
+  uint64_t _count_4MB;
+  uint64_t _count_16MB;
+  uint64_t _count_above_16MB;
+
+  uint64_t _size_64;
+  uint64_t _size_256;
+  uint64_t _size_1KB;
+  uint64_t _size_4KB;
+  uint64_t _size_64KB;
+  uint64_t _size_256KB;
+  uint64_t _size_1MB;
+  uint64_t _size_4MB;
+  uint64_t _size_16MB;
+  uint64_t _size_above_16MB;
+
+  void clear(){
+    _count_64 = 0;
+    _count_256 = 0;
+    _count_1KB = 0;
+    _count_4KB = 0;
+    _count_64KB = 0;
+    _count_256KB = 0;
+    _count_1MB = 0;
+    _count_4MB = 0;
+    _count_16MB = 0;
+    _count_above_16MB = 0;
+
+    _size_64 = 0;
+    _size_256 = 0;
+    _size_1KB = 0;
+    _size_4KB = 0;
+    _size_64KB = 0;
+    _size_256KB = 0;
+    _size_1MB = 0;
+    _size_4MB = 0;
+    _size_16MB = 0;
+    _size_above_16MB = 0;
+  }
+  
+  void add(size_t size){
+    if(size <= 64){
+      _count_64 += 1;
+      _size_64 += size;
+    }
+    else if(size <= 256){
+      _count_256 += 1;
+      _size_256 += size;
+    }
+    else if(size / 1024 <= 1){
+      _count_1KB += 1;
+      _size_1KB += size;
+    }
+    else if(size / 1024 <= 4){
+      _count_4KB += 1;
+      _size_4KB += size;
+    }
+    else if(size / 1024 <= 64){
+      _count_64KB += 1;
+      _size_64KB += size;
+    }    
+    else if(size / 1024 <= 256){
+      _count_256KB += 1;
+      _size_256KB += size;
+    }
+    else if(size / 1024 / 1024 <= 1){
+      _count_1MB += 1;
+      _size_1MB += size;
+    }    
+    else if(size / 1024 / 1024 <= 4){
+      _count_4MB += 1;
+      _size_4MB += size;
+    }    
+    else if(size / 1024 <= 16){
+      _count_16MB += 1;
+      _size_16MB += size;
+    }    
+    else {
+      _count_above_16MB += 1;
+      _size_above_16MB += size;
+    }
+  }
+
+  void print(const char* prefix) {
+    log_info(gc)("%s obj size count 64B: %lu 256B: %lu 1KB: %lu 4KB: %lu 64KB: %lu 256KB: %lu 1MB: %lu 4MB: %lu 16MB: %lu above_16MB: %lu",
+      prefix, 
+      _count_64,
+      _count_256,
+      _count_1KB,
+      _count_4KB,
+      _count_64KB,
+      _count_256KB,
+      _count_1MB,
+      _count_4MB,
+      _count_16MB,
+      _count_above_16MB
+    );
+    log_info(gc)("%s obj size count 64B: %lf 256B: %lf 1KB: %lf 4KB: %lf 64KB: %lf 256KB: %lf 1MB: %lf 4MB: %lf 16MB: %lf above_16MB: %lf", 
+      prefix,
+      _size_64 * 1.0 / 1024 / 1024,
+      _size_256 * 1.0 / 1024 / 1024,
+      _size_1KB * 1.0 / 1024 / 1024,
+      _size_4KB * 1.0 / 1024 / 1024,
+      _size_64KB * 1.0 / 1024 / 1024,
+      _size_256KB * 1.0 / 1024 / 1024,
+      _size_1MB * 1.0 / 1024 / 1024,
+      _size_4MB * 1.0 / 1024 / 1024,
+      _size_16MB * 1.0 / 1024 / 1024,
+      _size_above_16MB * 1.0 / 1024 / 1024
+    );
+  }
+}
+
 // A class representing a marking task.
 class G1CMTask : public TerminatorTerminator {
   friend class G1CMBitMapClosure;
@@ -745,6 +865,22 @@ private:
   // uint _count_global_queue_page_remote;
   uint _count_bitmap_page_local;
   uint _count_bitmap_page_remote;
+
+  // uint _count_push_to_global;
+
+  size_t _count_scan_obj_page_local;
+  size_t _count_scan_obj_page_remote;
+
+  size_t _count_all_black;
+  size_t _count_black_grey;
+  size_t _count_all_grey;
+
+  ObjSizeCounter _size_counter;
+
+  size_t _present_page_index;
+  bool _has_black;
+  bool _has_visited_grey;
+
 
   // Updates the local fields after this task has claimed
   // a new region to scan
@@ -898,6 +1034,16 @@ public:
     // _count_global_queue_page_remote = 0;
     _count_bitmap_page_local = 0;
     _count_bitmap_page_remote = 0;
+
+    _count_scan_obj_page_local = 0;
+    _count_scan_obj_page_remote = 0;
+
+    _count_all_black = 0;
+    _count_all_grey = 0;
+    _count_black_grey = 0;
+
+    _size_counter.clear();
+
   }
 
   void print_memliner_stats(){
@@ -911,6 +1057,16 @@ public:
     log_info(gc)(
       "_count_bitmap_page_local: %u _count_bitmap_page_remote: %u",
       _count_bitmap_page_local, _count_bitmap_page_remote);
+    
+    log_info(gc)(
+      "_count_scan_obj_page_local: %lu _count_scan_obj_page_remote: %lu",
+      _count_scan_obj_page_local, _count_scan_obj_page_remote
+    );
+    log_info(gc)(
+      "_count_all_black: %lu _count_all_grey: %lu _count_black_grey: %lu",
+      _count_all_black, _count_all_grey, _count_black_grey
+    );
+    _size_counter.print();
   }
 };
 

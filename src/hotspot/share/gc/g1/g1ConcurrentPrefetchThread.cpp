@@ -256,6 +256,7 @@ void G1ConcurrentPrefetchThread::run_service() {
 
       for(int i = 0; i < 1; i++){
         _pf->task(i)->print_memliner_stats();
+        log_info(gc)("PF %u ended", (unsigned)i);
       }
 
       {

@@ -524,6 +524,7 @@ void G1PFTask::move_entries_to_global_stack() {
 
   if (n > 0) {
     log_info(gc)("prefetcher overflow");
+    _count_push_to_global += n;    
     if (!_cm->mark_stack_push(buffer)) {
       // _cm->set_has_overflown();
       // ShouldNotReachHere();

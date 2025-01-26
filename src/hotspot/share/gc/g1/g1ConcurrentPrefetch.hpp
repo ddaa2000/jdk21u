@@ -520,6 +520,16 @@ private:
 
   uint _count_local_queue_page_local;
   uint _count_local_queue_page_remote;
+
+  uint _count_push_to_global;
+
+  size_t _count_scan_obj_page_local;
+  size_t _count_scan_obj_page_remote;
+
+  ObjSizeCounter _size_counter;
+
+
+
   // uint _count_scan_stat_0;
   // uint _count_scan_stat_1;
   // uint _count_scan;
@@ -678,6 +688,10 @@ public:
   void clear_memliner_stats(){
     _count_local_queue_page_local = 0;
     _count_local_queue_page_remote = 0;
+    _count_scan_obj_page_local = 0;
+    _count_scan_obj_page_remote = 0;
+    _count_push_to_global = 0;
+    _size_counter.clear();
   }
 
   void print_memliner_stats(){  
@@ -685,6 +699,15 @@ public:
       "prefetcher _count_local_queue_page_local: %u _count_local_queue_page_remote: %u",
       _count_local_queue_page_local, _count_local_queue_page_remote
     );
+    log_info(gc)(
+      "prefetcher _count_scan_obj_page_local: %lu _count_scan_obj_page_remote: %lu",
+      _count_scan_obj_page_local, _count_scan_obj_page_remote
+    );
+    log_info(gc)(
+      "prefetcher _count_push_to_global: %u",
+      _count_push_to_global
+    );
+    _size_counter.print();
   }
 
   inline bool is_below_global_finger(oop obj) const;
