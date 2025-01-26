@@ -374,7 +374,7 @@ public:
                 continue;
               }
               // bool success = task->make_reference_grey(cast_to_oop(ptr));
-              bool success = task->make_reference_black(cast_to_oop(ptr));
+              bool success = task->make_prefetch_reference_black(cast_to_oop(ptr));
               // pq_acc += 1;
 
               // if(success) {

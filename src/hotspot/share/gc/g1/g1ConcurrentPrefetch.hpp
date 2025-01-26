@@ -415,6 +415,8 @@ public:
   inline bool mark_in_bitmap(uint worker_id, oop const obj);
 
   inline bool mark_black_in_bitmap(uint const worker_id, oop const obj);
+  inline bool mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj);
+
 
   inline bool is_below_global_finger(oop obj) const;
 
@@ -620,6 +622,8 @@ public:
   // Returns whether there has been a mark to the bitmap.
   inline bool make_reference_grey(oop obj);
   inline bool make_reference_black(oop obj);
+  inline bool make_prefetch_reference_black(oop obj);
+
 
 
   // Grey the object (by calling make_grey_reference) if required,
