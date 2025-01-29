@@ -390,13 +390,9 @@ public:
             uint steal_count = 0;
             while (!_cm->has_aborted() && steal_count < 16) {
               G1TaskQueueEntry entry;
-              if (_cm->try_stealing(_worker_id, entry)) {
-                scan_task_entry(entry);
-
-                // And since we're towards the end, let's totally drain the
-                // local queue and global stack.
-                drain_local_queue(true);
-                drain_global_stack(true);
+              if (_cm->try_stealing(0, entry)) {
+                task->scan_task_entry(entry);
+                task->do_marking_step();
               } else {
                 break;
               }
