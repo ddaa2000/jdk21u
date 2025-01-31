@@ -393,13 +393,13 @@ public:
               if (_cm->try_stealing(0, entry)) {
                 task->scan_task_entry(entry);
                 task->do_marking_step();
+                task->_count_steal += 1;
               } else {
                 break;
               }
               steal_count += 1;
             }
           }
-
         } while (_cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted());
       }
 

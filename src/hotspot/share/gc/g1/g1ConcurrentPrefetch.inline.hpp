@@ -115,7 +115,7 @@ inline bool G1ConcurrentPrefetch::mark_black_in_bitmap(uint const worker_id, oop
   // return success;
 }
 
-inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj) {
+inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj, G1PFTask* task) {
   HeapRegion* const hr = _g1h->heap_region_containing(obj);
   assert(hr != NULL, "just checking");
   assert(hr->is_in_reserved(obj), "Attempting to mark object at " PTR_FORMAT " that is not contained in the given region %u", p2i(obj), hr->hrm_index());
@@ -148,6 +148,13 @@ inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worke
   // now the object is at least grey
   if(success){
     bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+    task->_count_prefetch_white += 1;
+  } else {
+    if(_cm->is_marked_in_black_bitmap(obj)){
+      task->_count_prefetch_black += 1;
+    } else {
+      task->_count_prefetch_grey += 1;
+    }
   }
   // bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
 
@@ -342,7 +349,7 @@ inline bool G1PFTask::make_reference_black(oop obj) {
 }
 
 inline bool G1PFTask::make_prefetch_reference_black(oop obj) {
-  if (!_pf->mark_prefetch_black_in_bitmap(_worker_id, obj)) {
+  if (!_pf->mark_prefetch_black_in_bitmap(_worker_id, obj, this)) {
     return false;
   }
 

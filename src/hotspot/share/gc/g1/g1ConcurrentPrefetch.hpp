@@ -415,7 +415,9 @@ public:
   inline bool mark_in_bitmap(uint worker_id, oop const obj);
 
   inline bool mark_black_in_bitmap(uint const worker_id, oop const obj);
-  inline bool mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj);
+  // inline bool mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj);
+  inline bool mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj, G1PFTask* task);
+
 
 
   inline bool is_below_global_finger(oop obj) const;
@@ -522,6 +524,13 @@ private:
 
   uint _count_local_queue_page_local;
   uint _count_local_queue_page_remote;
+
+  uint _count_prefetch_white;
+  uint _count_prefetch_grey;
+  uint _count_prefetch_black;
+
+  uint _count_steal;
+
   // uint _count_scan_stat_0;
   // uint _count_scan_stat_1;
   // uint _count_scan;
@@ -682,12 +691,19 @@ public:
   void clear_memliner_stats(){
     _count_local_queue_page_local = 0;
     _count_local_queue_page_remote = 0;
+    _count_prefetch_black = 0;
+    _count_prefetch_grey = 0;
+    _count_prefetch_white = 0;
   }
 
   void print_memliner_stats(){  
     log_info(gc)(
       "prefetcher _count_local_queue_page_local: %u _count_local_queue_page_remote: %u",
       _count_local_queue_page_local, _count_local_queue_page_remote
+    );
+    log_info(gc)(
+      "prefetcher _count_prefetch_black: %u _count_prefetch_grey: %u _count_prefetch_white: %u",
+      _count_prefetch_black, _count_prefetch_grey, _count_prefetch_white
     );
   }
 
