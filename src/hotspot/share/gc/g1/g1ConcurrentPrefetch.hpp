@@ -440,6 +440,7 @@ public:
 // A class representing a marking task.
 class G1PFTask : public TerminatorTerminator {
   friend class G1PFConcurrentPrefetchingTask;
+  friend class G1ConcurrentPrefetch;
 private:
   enum PrivateConstants {
     // The regular clock call is called once the scanned words reaches
@@ -694,12 +695,13 @@ public:
     _count_prefetch_black = 0;
     _count_prefetch_grey = 0;
     _count_prefetch_white = 0;
+    _count_steal = 0;
   }
 
   void print_memliner_stats(){  
     log_info(gc)(
-      "prefetcher _count_local_queue_page_local: %u _count_local_queue_page_remote: %u",
-      _count_local_queue_page_local, _count_local_queue_page_remote
+      "prefetcher _count_local_queue_page_local: %u _count_local_queue_page_remote: %u _count_steal: %u",
+      _count_local_queue_page_local, _count_local_queue_page_remote, _count_steal
     );
     log_info(gc)(
       "prefetcher _count_prefetch_black: %u _count_prefetch_grey: %u _count_prefetch_white: %u",

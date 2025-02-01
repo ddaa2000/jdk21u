@@ -266,7 +266,7 @@ Node* G1BarrierSetC2::prefetch_load_barrier(GraphKit* kit,
         } __ else_(); {
           // logging buffer is full, call the runtime
           const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-          __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), "write_ref_field_prefetch_entry", obj, tls);
+          __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", obj, tls);
         } __ end_if();  // (!index)
 
       } __ end_if();
@@ -401,7 +401,7 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
           } __ else_(); {
             // logging buffer is full, call the runtime
             const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-            __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), "write_ref_field_prefetch_entry", val, tls);
+            __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", val, tls);
           } __ end_if();  // (!index)
 
         } __ end_if();
@@ -804,15 +804,22 @@ Node* G1BarrierSetC2::load_at_resolved(C2Access& access, const Type* val_type) c
   bool need_read_barrier = (((on_weak || on_phantom) && !no_keepalive) ||
                             (in_heap && unknown && offset != top && obj != top));
 
-  if (!access.is_oop() || !need_read_barrier) {
-    return CardTableBarrierSetC2::load_at_resolved(access, val_type);
-  }
-
-  assert(access.is_parse_access(), "entry not supported at optimization time");
 
   C2ParseAccess& parse_access = static_cast<C2ParseAccess&>(access);
   GraphKit* kit = parse_access.kit();
   Node* load;
+
+  if (!access.is_oop() || !need_read_barrier) {
+    if (access.is_oop()) {
+      return prefetch_load_barrier(kit, kit->control(), CardTableBarrierSetC2::load_at_resolved(access, val_type));
+    } else {
+      return CardTableBarrierSetC2::load_at_resolved(access, val_type);
+    }
+  }
+
+  assert(access.is_parse_access(), "entry not supported at optimization time");
+
+
 
   Node* control =  kit->control();
   const TypePtr* adr_type = access.addr().type();
@@ -862,7 +869,9 @@ bool G1BarrierSetC2::is_gc_barrier_node(Node* node) const {
   }
 
   // return strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
-  return strcmp(call->_name, "write_ref_field_prefetch_entry") == 0 || strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
+  // return strcmp(call->_name, "write_ref_field_prefetch_entry") == 0 || strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
+  return strcmp(call->_name, "write_ref_field_prefetch_entry_c2") == 0 || strcmp(call->_name, "write_ref_field_prefetch_entry_c1") == 0 || strcmp(call->_name, "write_ref_field_prefetch_entry_asm") == 0 || strcmp(call->_name, "write_ref_field_prefetch_entry") == 0 || strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
+
 }
 
 bool G1BarrierSetC2::is_g1_pre_val_load(Node* n) {

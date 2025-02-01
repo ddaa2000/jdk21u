@@ -70,6 +70,8 @@ public:
   PrefetchQueue(PrefetchQueueSet* qset, bool permanent = false);
   ~PrefetchQueue();
 
+  Mutex* locker() { return &_m; }
+
   bool is_active() const { return _active; }
   void set_active(bool value) { _active = value; }
   void abandon_buffer();
@@ -160,6 +162,7 @@ public:
     if (_buf != nullptr) {
       // Two-fingered compaction toward the end.
       size_t remaining_objs = MIN2(prefetch_queue_threshold(), tail()-index());
+      // log_info(gc)("unhandled %lu", tail()-index());
       void** src = &_buf[index()];
       void** dst = &_buf[index() + remaining_objs - 1];
       void** end = &_buf[capacity() - 1];
@@ -184,7 +187,41 @@ public:
     // _in_dequeue = false;
   }
 
-  bool dequeue(void** ptrptr) { 
+  inline bool dequeue_no_lock(void** ptrptr){
+    if ( _buf == nullptr) {
+      *ptrptr = nullptr;
+      return false;
+    }
+
+    size_t current_index = index();
+    size_t current_tail = tail(); 
+    // if (current_tail < current_index){
+    //   log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+    //   ShouldNotReachHere();
+    // }
+
+    if(current_tail == current_index) {
+      *ptrptr = nullptr;
+
+      // _in_dequeue = false;
+      return false;
+    }
+
+    // if(current_tail == 0){
+    //   log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+    //   ShouldNotReachHere();
+    // }
+
+    *ptrptr = _buf[current_tail - 1];
+    set_tail(current_tail -  1);
+
+
+
+    // _in_dequeue = false;
+    return true;
+  }
+
+  inline bool dequeue(void** ptrptr) { 
 
     // while(_in_dequeue == true) {
     //   continue;
@@ -205,10 +242,10 @@ public:
 
     size_t current_index = index();
     size_t current_tail = tail(); 
-    if (current_tail < current_index){
-      log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
-      ShouldNotReachHere();
-    }
+    // if (current_tail < current_index){
+    //   log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+    //   ShouldNotReachHere();
+    // }
 
     if(current_tail == current_index) {
       *ptrptr = nullptr;
@@ -217,10 +254,10 @@ public:
       return false;
     }
 
-    if(current_tail == 0){
-      log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
-      ShouldNotReachHere();
-    }
+    // if(current_tail == 0){
+    //   log_info(gc)("current tail is %lu but current index is %lu, capacity is %lu", current_tail, current_index, capacity());
+    //   ShouldNotReachHere();
+    // }
 
     *ptrptr = _buf[current_tail - 1];
     set_tail(current_tail -  1);

@@ -359,47 +359,57 @@ public:
             }
           }
           G1CollectedHeap* g1h = G1CollectedHeap::heap();
+          uint prefetch_count = 0;
           if(get_queue) {
             void* ptr;
-            bool ret = prefetch_queue->dequeue(&ptr);
-            // uint pq_acc = 0;
+            {
+              MutexLocker z(prefetch_queue->locker(), Mutex::_no_safepoint_check_flag);
+              bool ret = prefetch_queue->dequeue_no_lock(&ptr);
+              // uint pq_acc = 0;
 
-            //hua: should be like this:?
-            // while (ret && ptr != NULL && _cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted()) {
-            while (ret && ptr != NULL) {
-              //hua: todo continue?
-              if(!g1h->is_in_reserved(ptr)) break;
-              if(discard_entry(ptr, g1h)){ 
-                ret = prefetch_queue->dequeue(&ptr);
-                continue;
+              //hua: should be like this:?
+              // while (ret && ptr != NULL && _cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted()) {
+              while (ret && ptr != NULL) {
+                //hua: todo continue?
+                if(!g1h->is_in_reserved(ptr)) break;
+                // if(discard_entry(ptr, g1h)){ 
+                //   ret = prefetch_queue->dequeue(&ptr);
+                //   continue;
+                // }
+                prefetch_count += 1;
+                // bool success = task->make_reference_grey(cast_to_oop(ptr));
+                bool success = task->make_prefetch_reference_black(cast_to_oop(ptr));
+                // pq_acc += 1;
+
+                // if(success) {
+                //   // log_debug(prefetch)("Succesfully mark one in PFTask!");
+                // }
+                ret = prefetch_queue->dequeue_no_lock(&ptr);
               }
-              // bool success = task->make_reference_grey(cast_to_oop(ptr));
-              bool success = task->make_prefetch_reference_black(cast_to_oop(ptr));
-              // pq_acc += 1;
-
-              // if(success) {
-              //   // log_debug(prefetch)("Succesfully mark one in PFTask!");
-              // }
-              ret = prefetch_queue->dequeue(&ptr);
             }
             // log_info(gc)("pq_acc: %u", pq_acc);
             prefetch_queue->release_processing();
+            // log_info(gc)("before do marking step");
             task->do_marking_step();
+            // log_info(gc)("after do marking step");
             _pf->do_yield_check();
           } else {
-            uint steal_count = 0;
-            while (!_cm->has_aborted() && steal_count < 16) {
-              G1TaskQueueEntry entry;
-              if (_cm->try_stealing(0, entry)) {
-                task->scan_task_entry(entry);
-                task->do_marking_step();
-                task->_count_steal += 1;
-              } else {
-                break;
-              }
-              steal_count += 1;
-            }
+            log_info(gc)("prefetch queue not found");
           }
+          // if(prefetch_count == 0) {
+          //   uint steal_count = 0;
+          //   while (!_cm->has_aborted() && steal_count < 16) {
+          //     G1TaskQueueEntry entry;
+          //     if (_cm->try_stealing(0, entry)) {
+          //       task->scan_task_entry(entry);
+          //       task->do_marking_step();
+          //       task->_count_steal += 1;
+          //     } else {
+          //       break;
+          //     }
+          //     steal_count += 1;
+          //   }
+          // }
         } while (_cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted());
       }
 

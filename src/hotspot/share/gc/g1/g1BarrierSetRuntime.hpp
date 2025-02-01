@@ -49,7 +49,10 @@ public:
 
 
   // Haoran: modify
-  static void write_ref_field_prefetch_entry(oopDesc* new_val, JavaThread* thread);
+  static void write_ref_field_prefetch_entry_asm(oopDesc* new_val, JavaThread* thread);
+  static void write_ref_field_prefetch_entry_c1(oopDesc* new_val, JavaThread* thread);
+  static void write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread);
+
 };
 
 #endif // SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP

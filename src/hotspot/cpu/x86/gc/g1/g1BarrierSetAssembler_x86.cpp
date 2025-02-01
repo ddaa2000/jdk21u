@@ -469,9 +469,9 @@ void G1BarrierSetAssembler::g1_prefetch_load_barrier_pre(MacroAssembler* masm,
     __ push(thread);
     __ push(obj);
 #endif
-    __ MacroAssembler::call_VM_leaf_base(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), 2);
+    __ MacroAssembler::call_VM_leaf_base(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_asm), 2);
   } else {
-    __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), obj, thread);
+    __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_asm), obj, thread);
   }
 
   __ pop_call_clobbered_registers();
@@ -794,7 +794,7 @@ void G1BarrierSetAssembler::generate_c1_post_barrier_runtime_stub(StubAssembler*
   __ bind(prefetch_runtime);
   __ save_live_registers_no_oop_map(true);
   __ load_parameter(1, rcx);
-  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
+  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1), rcx, thread);
   __ restore_live_registers(true);
   __ bind(prefetch_done);
 
@@ -932,7 +932,7 @@ void G1BarrierSetAssembler::generate_c1_prefetch_barrier_runtime_stub(StubAssemb
   __ bind(prefetch_runtime);
   __ save_live_registers_no_oop_map(true);
   __ load_parameter(0, rcx);
-  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), rcx, thread);
+  __ call_VM_leaf(CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1), rcx, thread);
   __ restore_live_registers(true);
   __ bind(prefetch_done);
 

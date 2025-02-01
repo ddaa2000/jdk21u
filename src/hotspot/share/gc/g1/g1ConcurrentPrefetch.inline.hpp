@@ -116,6 +116,7 @@ inline bool G1ConcurrentPrefetch::mark_black_in_bitmap(uint const worker_id, oop
 }
 
 inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worker_id, oop const obj, G1PFTask* task) {
+  // static HeapWord* prev_finger = nullptr;
   HeapRegion* const hr = _g1h->heap_region_containing(obj);
   assert(hr != NULL, "just checking");
   assert(hr->is_in_reserved(obj), "Attempting to mark object at " PTR_FORMAT " that is not contained in the given region %u", p2i(obj), hr->hrm_index());
@@ -135,33 +136,49 @@ inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worke
   //  else if the object is marked grey -> mark black, ensure its children put to the local stack
   //  else (the object is not marked) -> mark black, ensure its children put to the local stack
 
+  if(obj->is_objArray() && obj->size() > 512){
+    return false;
+  }
 
   bool success = _cm->_mark_bitmap.par_mark(obj);
   if (success) {
     add_to_liveness(worker_id, obj, obj->size());
   }
 
-  // if (!success && is_below_global_finger(obj)){ // already black
-  //   return false;
+  // if(prev_finger != _cm->finger()){
+  //   prev_finger = _cm->finger();
+  //   task->print_memliner_stats();
   // }
+
+
+  if (!success && is_below_global_finger(obj)){ // already black
+    task->_count_prefetch_black += 1;
+    return false;
+  }
   OrderAccess::storestore();
   // now the object is at least grey
-  if(success){
-    bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+  // if(success){
+  //   bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+  //   task->_count_prefetch_white += 1;
+  // } else {
+  //   if(_cm->is_marked_in_black_bitmap(obj)){
+  //     task->_count_prefetch_black += 1;
+  //   } else {
+  //     task->_count_prefetch_grey += 1;
+  //   }
+  // }
+  bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
+  if(!success_black){
+    task->_count_prefetch_black += 1;
+  } else if (success){
     task->_count_prefetch_white += 1;
   } else {
-    if(_cm->is_marked_in_black_bitmap(obj)){
-      task->_count_prefetch_black += 1;
-    } else {
-      task->_count_prefetch_grey += 1;
-    }
+    task->_count_prefetch_grey += 1;
   }
-  // bool success_black = _cm->_mark_black_bitmap.par_mark(obj);
-
   
-  // return success_black;
+  return success_black;
 
-  return success;
+  // return success;
 }
 
 // #ifndef PRODUCT

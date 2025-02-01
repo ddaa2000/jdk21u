@@ -254,7 +254,7 @@ void G1ConcurrentPrefetchThread::run_service() {
 
       log_info(gc)("prefetcher finish conc prefetching");
 
-      for(int i = 0; i < 1; i++){
+      for(uint i = 0; i < PrefetchThreads; i++){
         _pf->task(i)->print_memliner_stats();
       }
 
