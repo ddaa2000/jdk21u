@@ -136,9 +136,12 @@ inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worke
   //  else if the object is marked grey -> mark black, ensure its children put to the local stack
   //  else (the object is not marked) -> mark black, ensure its children put to the local stack
 
-  if(obj->is_objArray() && obj->size() > 512){
-    return false;
-  }
+  // if(obj->is_objArray() && obj->size() > 512){
+  //   return false;
+  // }
+  uint val = *cast_from_oop<uint*>(obj);
+  task->_count_prefetch_black += val;
+  return false;
 
   bool success = _cm->_mark_bitmap.par_mark(obj);
   if (success) {
