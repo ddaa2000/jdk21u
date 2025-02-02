@@ -322,7 +322,7 @@ public:
 
       G1PFTask* task = _pf->task(worker_id);
       task->record_start_time();
-      if (!_cm->has_aborted()) {
+      {
         do { //hua: should we keep this while loop?
           // G1TaskQueueEntry entry;
 
@@ -339,7 +339,7 @@ public:
             index--;
           }
           bool get_queue = 0;
-          while(_cm->in_conc_mark_from_roots() && !_cm->has_aborted()) {
+          while(!_pf->_pf_thread->should_terminate()) {
             if(t == NULL) {
               jtiwh.rewind();
               t = jtiwh.next();
@@ -390,7 +390,7 @@ public:
             // log_info(gc)("pq_acc: %u", pq_acc);
             prefetch_queue->release_processing();
             // log_info(gc)("before do marking step");
-            task->do_marking_step();
+            // task->do_marking_step();
             // log_info(gc)("after do marking step");
             _pf->do_yield_check();
           } else {
@@ -410,12 +410,12 @@ public:
           //     steal_count += 1;
           //   }
           // }
-        } while (_cm->in_conc_mark_from_roots() && !_cm->has_aborted() && !task->has_aborted());
+        } while (!_pf->_pf_thread->should_terminate());
       }
 
-      if ( _cm->has_aborted() || task->has_aborted() ){
-        _pf->set_has_aborted();
-      }
+      // if ( _cm->has_aborted() || task->has_aborted() ){
+      //   _pf->set_has_aborted();
+      // }
       task->record_end_time();
       log_debug(prefetch)("G1PFConcurrentPrefetchingTask duration %lf ms", task->_elapsed_time_ms);
       // guarantee(!_cm->in_conc_mark_from_roots(), "invariant");

@@ -846,8 +846,8 @@ void G1ConcurrentMark::post_concurrent_mark_start() {
 
   //hua: todo check whether other states are synced with satb
   // Haoran: modify
-  prefetch_mq_set.set_active_all_threads(true, /* new active value */
-                    false /* expected_active */);
+  // prefetch_mq_set.set_active_all_threads(true, /* new active value */
+  //                   false /* expected_active */);
 
 
   _root_regions.prepare_for_scan();
@@ -1108,15 +1108,15 @@ void G1ConcurrentMark::mark_from_roots() {
   print_stats();
 
   set_in_conc_mark_from_roots(false);
-  {
-    log_info(gc)("before CCM mark from roots finish");
-    MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-    while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-      ml.wait();
-    }
-    log_info(gc)("after CCM mark from roots finish");
+  // {
+  //   log_info(gc)("before CCM mark from roots finish");
+  //   MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+  //   while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+  //     ml.wait();
+  //   }
+  //   log_info(gc)("after CCM mark from roots finish");
 
-  }
+  // }
 }
 
 const char* G1ConcurrentMark::verify_location_string(VerifyLocation location) {
@@ -1332,8 +1332,8 @@ void G1ConcurrentMark::remark() {
     // We're done with marking.
     // This is the end of the marking cycle, we're expected all
     // threads to have SATB queues with active set to true.
-    prefetch_mq_set.set_active_all_threads(false, /* new active value */
-                    true /* expected_active */);
+    // prefetch_mq_set.set_active_all_threads(false, /* new active value */
+    //                 true /* expected_active */);
     prefetch_mq_set.abandon_partial_marking();
 
 
@@ -2104,10 +2104,10 @@ bool G1ConcurrentMark::concurrent_cycle_abort() {
   // pq_set.abandon_partial_marking();
   // This can be called either during or outside marking, we'll read
   // the expected_active value from the SATB queue set.
-  pq_set.set_active_all_threads(
-                                 false, /* new active value */
-                                 pq_set.is_active() /* expected_active */);
-  pq_set.abandon_partial_marking();
+  // pq_set.set_active_all_threads(
+  //                                false, /* new active value */
+  //                                pq_set.is_active() /* expected_active */);
+  // pq_set.abandon_partial_marking();
 
   return true;
 }
@@ -2917,26 +2917,26 @@ void G1CMTask::do_marking_step(double time_target_ms,
       if (!is_serial) {
         // We only need to enter the sync barrier if being called
         // from a parallel context
-        if( _worker_id == 0){
-          log_info(gc)("before CCM overflow handle");
-          MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-          while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-            ml.wait();
-          }
-          log_info(gc)("after CCM overflow handle");
-        }
+        // if( _worker_id == 0){
+        //   log_info(gc)("before CCM overflow handle");
+        //   MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+        //   while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+        //     ml.wait();
+        //   }
+        //   log_info(gc)("after CCM overflow handle");
+        // }
         _cm->enter_first_sync_barrier(_worker_id);
 
         // When we exit this sync barrier we know that all tasks have
         // stopped doing marking work. So, it's now safe to
         // re-initialize our data structures.
       } else {
-        log_info(gc)("before CCM overflow handle");
-        MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-        while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-          ml.wait();
-        }
-        log_info(gc)("after CCM overflow handle");
+        // log_info(gc)("before CCM overflow handle");
+        // MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+        // while(!G1CollectedHeap::heap()->_pf_thread->idle()){
+        //   ml.wait();
+        // }
+        // log_info(gc)("after CCM overflow handle");
       }
 
       clear_region_fields();

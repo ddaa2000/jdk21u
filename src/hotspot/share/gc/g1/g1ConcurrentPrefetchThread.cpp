@@ -242,19 +242,21 @@ void G1ConcurrentPrefetchThread::run_service() {
       for(int i = 0; i < 1; i++){
         _pf->task(i)->clear_memliner_stats();
       }
+      _pf->mark_from_stacks();
 
-      if (_state == FullMark){
-        while(_cm->in_conc_mark_from_roots() && !_pf->has_aborted() && !_cm->has_aborted() && !_cm->has_overflown()) {
-          _pf->mark_from_stacks();
-        }
-      } else {
-        assert(_state == UndoMark, "Must do undo mark but is %d", _state);
-        //hua: todo undo cycle
-      }
+
+      // if (_state == FullMark){
+      //   while(_cm->in_conc_mark_from_roots() && !_pf->has_aborted() && !_cm->has_aborted() && !_cm->has_overflown()) {
+      //     _pf->mark_from_stacks();
+      //   }
+      // } else {
+      //   assert(_state == UndoMark, "Must do undo mark but is %d", _state);
+      //   //hua: todo undo cycle
+      // }
 
       log_info(gc)("prefetcher finish conc prefetching");
 
-      for(uint i = 0; i < PrefetchThreads; i++){
+      for(int i = 0; i < 1; i++){
         _pf->task(i)->print_memliner_stats();
       }
 
@@ -270,10 +272,10 @@ void G1ConcurrentPrefetchThread::run_service() {
       _vtime_accum = (end_time - _vtime_start);
       log_info(gc)("PrefetchThread cycle %lf s", os::elapsedTime()-cycle_start_time);
 
-      {
-        MutexLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-        CCM_finish_lock->notify();
-      }
+      // {
+      //   MutexLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
+      //   CCM_finish_lock->notify();
+      // }
     }
   }
 }

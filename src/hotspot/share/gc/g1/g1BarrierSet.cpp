@@ -160,7 +160,9 @@ void G1BarrierSet::on_thread_attach(Thread* thread) {
   PrefetchQueue& pq = G1ThreadLocalData::prefetch_queue(thread);
 
   PrefetchQueueSet& pq_set = G1CollectedHeap::heap()->prefetch_queue_set();
-  pq.set_active(pq_set.is_active()); //hua: todo modify
+  // pq.set_active(pq_set.is_active()); //hua: todo modify
+  pq.set_active(true); //hua: todo modify
+
 }
 
 void G1BarrierSet::on_thread_detach(Thread* thread) {

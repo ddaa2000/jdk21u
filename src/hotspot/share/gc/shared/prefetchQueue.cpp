@@ -125,7 +125,7 @@ PrefetchQueueSet::PrefetchQueueSet(BufferNode::Allocator* allocator) :
   _count_and_process_flag(0),
   _process_completed_buffers_threshold(SIZE_MAX),
   _buffer_enqueue_threshold(0),
-  _all_active(false)
+  _all_active(true)
 {}
 
 PrefetchQueueSet::~PrefetchQueueSet() {
