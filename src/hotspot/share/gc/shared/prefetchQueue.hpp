@@ -200,7 +200,7 @@ public:
     //   ShouldNotReachHere();
     // }
 
-    if(current_tail == current_index) {
+    if(current_tail - current_index < 128) {
       *ptrptr = nullptr;
 
       // _in_dequeue = false;

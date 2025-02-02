@@ -362,6 +362,7 @@ public:
           uint prefetch_count = 0;
           if(get_queue) {
             void* ptr;
+            // log_info(gc)("got queue");
             {
               MutexLocker z(prefetch_queue->locker(), Mutex::_no_safepoint_check_flag);
               bool ret = prefetch_queue->dequeue_no_lock(&ptr);
@@ -378,6 +379,7 @@ public:
                 // }
                 prefetch_count += 1;
                 // bool success = task->make_reference_grey(cast_to_oop(ptr));
+                // log_info(gc)("got result");
                 bool success = task->make_prefetch_reference_black(cast_to_oop(ptr));
                 // pq_acc += 1;
 
@@ -394,7 +396,7 @@ public:
             // log_info(gc)("after do marking step");
             _pf->do_yield_check();
           } else {
-            log_info(gc)("prefetch queue not found");
+            // log_info(gc)("prefetch queue not found");
           }
           // if(prefetch_count == 0) {
           //   uint steal_count = 0;

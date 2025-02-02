@@ -121,9 +121,9 @@ inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worke
   assert(hr != NULL, "just checking");
   assert(hr->is_in_reserved(obj), "Attempting to mark object at " PTR_FORMAT " that is not contained in the given region %u", p2i(obj), hr->hrm_index());
 
-  if (hr->obj_allocated_since_marking_start(obj)) {
-    return false;
-  }
+  // if (hr->obj_allocated_since_marking_start(obj)) {
+  //   return false;
+  // }
 
   // Some callers may have stale objects to mark above nTAMS after humongous reclaim.
   // Can't assert that this is a valid object at this point, since it might be in the process of being copied by another thread.
@@ -141,6 +141,7 @@ inline bool G1ConcurrentPrefetch::mark_prefetch_black_in_bitmap(uint const worke
   // }
   uint val = *cast_from_oop<uint*>(obj);
   task->_count_prefetch_black += val;
+  // log_info(gc)("mark prefetch");
   return false;
 
   bool success = _cm->_mark_bitmap.par_mark(obj);
@@ -369,6 +370,7 @@ inline bool G1PFTask::make_reference_black(oop obj) {
 }
 
 inline bool G1PFTask::make_prefetch_reference_black(oop obj) {
+  // log_info(gc)("make prefetch ref black");
   if (!_pf->mark_prefetch_black_in_bitmap(_worker_id, obj, this)) {
     return false;
   }

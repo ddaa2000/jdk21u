@@ -222,7 +222,7 @@ void G1ConcurrentPrefetchThread::run_service() {
   G1CollectedHeap* g1h = G1CollectedHeap::heap();
   G1Policy* g1_policy = g1h->policy();
 
-  while (wait_for_next_cycle()) {
+  while (!should_terminate()) {
     assert(in_progress(), "must be");
 
     // if (should_terminate()) {
