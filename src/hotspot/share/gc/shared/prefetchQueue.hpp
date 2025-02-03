@@ -200,7 +200,7 @@ public:
     //   ShouldNotReachHere();
     // }
 
-    if(current_tail == current_index) {
+    if(current_tail - current_index <= PrefetchDelay) {
       *ptrptr = nullptr;
 
       // _in_dequeue = false;
@@ -247,7 +247,7 @@ public:
     //   ShouldNotReachHere();
     // }
 
-    if(current_tail == current_index) {
+    if(current_tail - current_index <= PrefetchDelay) {
       *ptrptr = nullptr;
 
       // _in_dequeue = false;

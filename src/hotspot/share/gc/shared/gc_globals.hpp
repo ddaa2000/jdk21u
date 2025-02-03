@@ -175,6 +175,9 @@
   product(uint, PrefetchQueueThreshold, 0,                                  \
           "The number of objects that remains after cleaning")              \
           range(0, max_jint)                                                \
+  product(uint, PrefetchDelay, 0,                                           \
+          "The number of objects before first prefetch")                    \
+          range(0, max_jint)                                                \
                                                                             \
   product(bool, AlwaysTenure, false,                                        \
           "Always tenure objects in eden (ParallelGC only)")                \

@@ -239,7 +239,7 @@ void G1ConcurrentPrefetchThread::run_service() {
       // the "end" logging is inside the loop and not at the end of
       // a scope. Also, the timer doesn't support nesting.
       // Mimicking the same log output instead.
-      for(int i = 0; i < 1; i++){
+      for(uint i = 0; i < PrefetchThreads; i++){
         _pf->task(i)->clear_memliner_stats();
       }
 
