@@ -1512,6 +1512,46 @@ static inline void proc_majflt_minflt_and_cputime(const char* fname, long* majfl
   *sys_time = *sys_time * (1000 / clock_tics_per_sec);
 }
 
+static inline void proc_cputime_nano(const char* fname, size_t* user_time, size_t* sys_time) {
+  // Get the majflt, user and sys time field from /proc/<pid>/<tid>/stat
+  char *s;
+  char stat[2048];
+  int statlen;
+  int count;
+  char cdummy;
+  int idummy;
+  long ldummy;
+  FILE *fp;
+
+  *sys_time = *user_time = 0;
+
+  fp = os::fopen(fname, "r");
+  if (fp == nullptr) return ;
+  statlen = fread(stat, 1, 2047, fp);
+  stat[statlen] = '\0';
+  fclose(fp);
+
+  // Skip pid and the command string. Note that we could be dealing with
+  // weird command names, e.g. user could decide to rename java launcher
+  // to "java 1.4.2 :)", then the stat file would look like
+  //                1234 (java 1.4.2 :)) R ... ...
+  // We don't really need to know the command string, just find the last
+  // occurrence of ")" and then start parsing from there. See bug 4726580.
+  s = strrchr(stat, ')');
+  if (s == nullptr) return ;
+
+  // Skip blank chars
+  do { s++; } while (s && isspace(*s));
+
+  count = sscanf(s,"%c %d %d %d %d %d %lu %lu %lu %lu %lu %lu %lu",
+                 &cdummy, &idummy, &idummy, &idummy, &idummy, &idummy,
+                 &ldummy, minflt, &ldummy, majflt, &ldummy,
+                 user_time, sys_time);
+  if (count != 15 - 2) return ;
+  *user_time = (size_t)(*user_time * (1000 * 1000 * 1000.0 / clock_tics_per_sec));
+  *sys_time = (size_t)(*sys_time * (1000 * 1000 * 1000.0 / clock_tics_per_sec));
+}
+
 // Error will return 0
 void os::get_accum_majflt_minflt(long* majflt, long* minflt) {
   if (proc_majflt_and_minflt("/proc/self/stat", majflt, minflt) == 0) {
@@ -1605,14 +1645,14 @@ long os::get_accum_thread_usertime() {
 size_t os::get_cur_thread_usertime() {
   pid_t tid;
   char proc_name[64];
-  long majflt, minflt, user_time, sys_time;
+  size_t user_time, sys_time;
   size_t njt_user_time;
 
   tid = Thread::current()->osthread()->thread_id();
 
   // Get non-jthread stats
   snprintf(proc_name, 64, "/proc/self/task/%d/stat", tid);
-  proc_majflt_minflt_and_cputime(proc_name, &majflt, &minflt, &user_time, &sys_time);
+  proc_cputime_nano(proc_name, &user_time, &sys_time);
   njt_user_time = (size_t)user_time;
 
   return njt_user_time;
