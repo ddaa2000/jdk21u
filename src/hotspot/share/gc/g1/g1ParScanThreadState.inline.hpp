@@ -55,7 +55,9 @@ void G1ParScanThreadState::trim_queue_partially() {
   assert(_task_queue->overflow_empty(), "invariant");
   assert(_task_queue->size() <= _stack_trim_lower_threshold, "invariant");
   _trim_ticks += Ticks::now() - start;
-  _trim_ticks_user += os::get_cur_thread_usertime() - start_user;
+  size_t delta_time = os::get_cur_thread_usertime() - start_user;
+  _trim_ticks_user += delta_time;
+  log_info(gc)("triming time: %lu", delta_time);
 }
 
 void G1ParScanThreadState::trim_queue() {

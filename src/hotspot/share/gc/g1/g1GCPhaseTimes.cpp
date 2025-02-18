@@ -605,7 +605,9 @@ G1EvacPhaseWithTrimTimeTracker::~G1EvacPhaseWithTrimTimeTracker() {
 void G1EvacPhaseWithTrimTimeTracker::stop() {
   assert(!_stopped, "Should only be called once");
   _total_time += (Ticks::now() - _start) - _pss->trim_ticks();
-  _total_time_user += (os::get_cur_thread_usertime() - _start_user) - _pss->trim_ticks_user();
+  size_t total_time = os::get_cur_thread_usertime() - _start_user;
+  _total_time_user += total_time - _pss->trim_ticks_user();
+  log_info(gc)("scan time user: %lu, trim time user: %lu", total_time - _pss->trim_ticks_user(), _pss->trim_ticks_user());
   _trim_time += _pss->trim_ticks();
   _trim_time_user += _pss->trim_ticks_user();
   _pss->reset_trim_ticks();
