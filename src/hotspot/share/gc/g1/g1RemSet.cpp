@@ -526,8 +526,8 @@ class G1ScanHRForRegionClosure : public HeapRegionClosure {
   Tickspan _rem_set_root_scan_time;
   Tickspan _rem_set_trim_partially_time;
 
-  long _rem_set_root_scan_user_time;
-  long _rem_set_trim_partially_user_time;
+  size_t _rem_set_root_scan_user_time;
+  size_t _rem_set_trim_partially_user_time;
 
 
   // The address to which this thread already scanned (walked the heap) up to during
@@ -735,8 +735,8 @@ public:
   Tickspan rem_set_root_scan_time() const { return _rem_set_root_scan_time; }
   Tickspan rem_set_trim_partially_time() const { return _rem_set_trim_partially_time; }
 
-  long rem_set_root_scan_user_time() const { return _rem_set_root_scan_user_time; }
-  long rem_set_trim_partially_user_time() const { return _rem_set_trim_partially_user_time; }
+  size_t rem_set_root_scan_user_time() const { return _rem_set_root_scan_user_time; }
+  size_t rem_set_trim_partially_user_time() const { return _rem_set_trim_partially_user_time; }
 
   size_t cards_scanned() const { return _cards_scanned; }
   size_t blocks_scanned() const { return _blocks_scanned; }
@@ -762,7 +762,7 @@ void G1RemSet::scan_heap_roots(G1ParScanThreadState* pss,
 
 
   p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_root_scan_time().seconds());
-  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_root_scan_user_time(), G1GCPhaseTimes::UserTime);
+  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_root_scan_user_time(), G1GCPhaseTimes::ScanHRUserTime);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.cards_scanned(), G1GCPhaseTimes::ScanHRScannedCards);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.blocks_scanned(), G1GCPhaseTimes::ScanHRScannedBlocks);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.chunks_claimed(), G1GCPhaseTimes::ScanHRClaimedChunks);
@@ -787,14 +787,14 @@ class G1ScanCollectionSetRegionClosure : public HeapRegionClosure {
   Tickspan _code_root_scan_time;
   Tickspan _code_trim_partially_time;
 
-  long _code_root_scan_user_time;
-  long _code_trim_partially_user_time;
+  size_t _code_root_scan_user_time;
+  size_t _code_trim_partially_user_time;
 
   Tickspan _rem_set_opt_root_scan_time;
   Tickspan _rem_set_opt_trim_partially_time;
 
-  long _rem_set_opt_root_scan_user_time;
-  long _rem_set_opt_trim_partially_user_time;
+  size_t _rem_set_opt_root_scan_user_time;
+  size_t _rem_set_opt_trim_partially_user_time;
 
   void scan_opt_rem_set_roots(HeapRegion* r) {
     G1OopStarChunkedList* opt_rem_set_list = _pss->oops_into_optional_region(r);
@@ -856,14 +856,14 @@ public:
   Tickspan code_root_scan_time() const { return _code_root_scan_time;  }
   Tickspan code_root_trim_partially_time() const { return _code_trim_partially_time; }
 
-  long code_root_scan_time() const { return _code_root_scan_user_time;  }
-  long code_root_trim_partially_time() const { return _code_trim_partially_user_time; }
+  size_t code_root_scan_user_time() const { return _code_root_scan_user_time;  }
+  size_t code_root_trim_partially_user_time() const { return _code_trim_partially_user_time; }
 
   Tickspan rem_set_opt_root_scan_time() const { return _rem_set_opt_root_scan_time; }
   Tickspan rem_set_opt_trim_partially_time() const { return _rem_set_opt_trim_partially_time; }
 
-  long rem_set_opt_root_scan_user_time() const { return _rem_set_opt_root_scan_user_time; }
-  long rem_set_opt_trim_partially_user_time() const { return _rem_set_opt_trim_partially_user_time; }
+  size_t rem_set_opt_root_scan_user_time() const { return _rem_set_opt_root_scan_user_time; }
+  size_t rem_set_opt_trim_partially_user_time() const { return _rem_set_opt_trim_partially_user_time; }
 
   size_t opt_roots_scanned() const { return _opt_roots_scanned; }
   size_t opt_refs_scanned() const { return _opt_refs_scanned; }
@@ -883,8 +883,8 @@ void G1RemSet::scan_collection_set_regions(G1ParScanThreadState* pss,
   p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_root_scan_time().seconds());
   p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_trim_partially_time().seconds());
   
-  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_root_scan_user_time(), G1GCPhaseTimes::UserTime);
-  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_trim_partially_user_time(), G1GCPhaseTimes::UserTime);
+  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_root_scan_user_time(), G1GCPhaseTimes::ScanHRUserTime);
+  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_trim_partially_user_time(), G1GCPhaseTimes::ScanHRUserTime);
 
 
   p->record_or_add_time_secs(coderoots_phase, worker_id, cl.code_root_scan_time().seconds());

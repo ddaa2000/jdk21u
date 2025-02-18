@@ -193,14 +193,6 @@ void G1Analytics::report_cost_per_card_merge_ms(double cost_per_card_ms, bool fo
   _cost_per_card_merge_ms_seq.add(cost_per_card_ms, for_young_only_phase);
 }
 
-void G1Analytics::report_cost_per_card_scan_user(double cost_per_card_cpu, bool for_young_only_phase) {
-  _cost_per_card_scan_user_seq.add(cost_per_card_cpu, for_young_only_phase);
-}
-
-void G1Analytics::report_cost_per_card_merge_ms(double cost_per_card_cpu, bool for_young_only_phase) {
-  _cost_per_card_merge_cpu_seq.add(cost_per_card_cpu, for_young_only_phase);
-}
-
 void G1Analytics::report_card_scan_to_merge_ratio(double merge_to_scan_ratio, bool for_young_only_phase) {
   _card_scan_to_merge_ratio_seq.add(merge_to_scan_ratio, for_young_only_phase);
 }

@@ -126,7 +126,8 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
     ScanHRClaimedChunks,
     ScanHRFoundRoots,
     ScanHRScannedOptRefs,
-    ScanHRUsedMemory
+    ScanHRUsedMemory,
+    ScanHRUserTime,
   };
 
   enum GCCPUTimeItems {
@@ -408,6 +409,7 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
 class G1EvacPhaseWithTrimTimeTracker : public StackObj {
   G1ParScanThreadState* _pss;
   Ticks _start;
+  size_t _start_user;
 
   Tickspan& _total_time;
   Tickspan& _trim_time;
