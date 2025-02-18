@@ -60,6 +60,13 @@ class G1Analytics: public CHeapObj<mtGC> {
   // The cost to copy a byte in ms.
   G1PhaseDependentSeq _cost_per_byte_copied_ms_seq;
 
+  // The cost to scan a card during young-only and mixed gcs in ms.
+  G1PhaseDependentSeq _cost_per_card_scan_user_seq;
+  // The cost to merge a card during young-only and mixed gcs in ms.
+  G1PhaseDependentSeq _cost_per_card_merge_cpu_seq;
+  // The cost to copy a byte in ms.
+  G1PhaseDependentSeq _cost_per_byte_copied_user_seq;
+
   G1PhaseDependentSeq _pending_cards_seq;
   G1PhaseDependentSeq _rs_length_seq;
 
@@ -127,9 +134,12 @@ public:
   void report_dirtied_cards_in_thread_buffers(size_t num_cards);
   void report_cost_per_card_scan_ms(double cost_per_remset_card_ms, bool for_young_only_phase);
   void report_cost_per_card_merge_ms(double cost_per_card_ms, bool for_young_only_phase);
+  void report_cost_per_card_scan_user(double cost_per_remset_card_cpu, bool for_young_only_phase);
+  void report_cost_per_card_merge_cpu(double cost_per_card_cpu, bool for_young_only_phase);
   void report_card_scan_to_merge_ratio(double cards_per_entry_ratio, bool for_young_only_phase);
   void report_rs_length_diff(double rs_length_diff, bool for_young_only_phase);
   void report_cost_per_byte_ms(double cost_per_byte_ms, bool for_young_only_phase);
+  void report_cost_per_byte_cpu(double cost_per_byte_cpu, bool for_young_only_phase);
   void report_young_other_cost_per_region_ms(double other_cost_per_region_ms);
   void report_non_young_other_cost_per_region_ms(double other_cost_per_region_ms);
   void report_constant_other_time_ms(double constant_other_time_ms);

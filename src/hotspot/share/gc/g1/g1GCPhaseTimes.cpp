@@ -108,10 +108,15 @@ G1GCPhaseTimes::G1GCPhaseTimes(STWGCTimer* gc_timer, uint max_gc_threads) :
   _gc_par_phases[RestorePreservedMarks] = new WorkerDataArray<double>("RestorePreservedMarks", "Restore Preserved Marks (ms):", max_gc_threads);
   _gc_par_phases[ClearRetainedRegionBitmaps] = new WorkerDataArray<double>("ClearRetainedRegionsBitmap", "Clear Retained Region Bitmaps (ms):", max_gc_threads);
 
+  _gc_par_phases[ObjCopy]->create_thread_work_items("User Time:", UserTime);
+  _gc_par_phases[OptObjCopy]->create_thread_work_items("User Time:", UserTime);
+
   _gc_par_phases[ScanHR]->create_thread_work_items("Scanned Cards:", ScanHRScannedCards);
   _gc_par_phases[ScanHR]->create_thread_work_items("Scanned Blocks:", ScanHRScannedBlocks);
   _gc_par_phases[ScanHR]->create_thread_work_items("Claimed Chunks:", ScanHRClaimedChunks);
   _gc_par_phases[ScanHR]->create_thread_work_items("Found Roots:", ScanHRFoundRoots);
+
+  _gc_par_phases[ScanHR]->create_thread_work_items("User Time:", UserTime);
 
   _gc_par_phases[OptScanHR]->create_thread_work_items("Scanned Cards:", ScanHRScannedCards);
   _gc_par_phases[OptScanHR]->create_thread_work_items("Scanned Blocks:", ScanHRScannedBlocks);
@@ -119,6 +124,8 @@ G1GCPhaseTimes::G1GCPhaseTimes(STWGCTimer* gc_timer, uint max_gc_threads) :
   _gc_par_phases[OptScanHR]->create_thread_work_items("Found Roots:", ScanHRFoundRoots);
   _gc_par_phases[OptScanHR]->create_thread_work_items("Scanned Refs:", ScanHRScannedOptRefs);
   _gc_par_phases[OptScanHR]->create_thread_work_items("Used Memory:", ScanHRUsedMemory);
+
+  _gc_par_phases[OptScanHR]->create_thread_work_items("User Time:", UserTime);
 
   _gc_par_phases[MergeLB]->create_thread_work_items("Dirty Cards:", MergeLBDirtyCards);
   _gc_par_phases[MergeLB]->create_thread_work_items("Skipped Cards:", MergeLBSkippedCards);
@@ -576,11 +583,13 @@ const char* G1GCPhaseTimes::phase_name(GCParPhases phase) {
   return phase_times->_gc_par_phases[phase]->short_name();
 }
 
-G1EvacPhaseWithTrimTimeTracker::G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time) :
+G1EvacPhaseWithTrimTimeTracker::G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time, long& total_time_user, long& trim_time_user) :
   _pss(pss),
   _start(Ticks::now()),
   _total_time(total_time),
   _trim_time(trim_time),
+  _total_time_user(total_time_user),
+  _trim_time_user(trim_time_user),
   _stopped(false) {
 
   assert(_pss->trim_ticks().value() == 0, "Possibly remaining trim ticks left over from previous use");
@@ -595,7 +604,9 @@ G1EvacPhaseWithTrimTimeTracker::~G1EvacPhaseWithTrimTimeTracker() {
 void G1EvacPhaseWithTrimTimeTracker::stop() {
   assert(!_stopped, "Should only be called once");
   _total_time += (Ticks::now() - _start) - _pss->trim_ticks();
+  _total_time_user += (os::get_cur_thread_usertime() - _start_user) - _pss->trim_ticks_user();
   _trim_time += _pss->trim_ticks();
+  _trim_time_user += _pss->trim_ticks_user();
   _pss->reset_trim_ticks();
   _stopped = true;
 }

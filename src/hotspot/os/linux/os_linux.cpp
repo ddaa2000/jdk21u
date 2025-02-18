@@ -1584,6 +1584,40 @@ void os::dump_accum_thread_majflt_minflt_and_cputime(const char *prefix) {
     njt_majflt, njt_minflt, njt_user_time, njt_sys_time);
 }
 
+long os::get_accum_thread_usertime() {
+  pid_t tid;
+  char proc_name[64];
+  long majflt, minflt, user_time, sys_time;
+  long njt_user_time;
+
+  // Get non-jthread stats
+  for (NonJavaThread::Iterator njti; !njti.end(); njti.step()) {
+    NonJavaThread* njt = njti.current();
+    tid = njt->osthread()->thread_id();
+    snprintf(proc_name, 64, "/proc/self/task/%d/stat", tid);
+    proc_majflt_minflt_and_cputime(proc_name, &majflt, &minflt, &user_time, &sys_time);
+    njt_user_time += user_time;
+  }
+
+  return njt_user_time;
+}
+
+size_t os::get_cur_thread_usertime() {
+  pid_t tid;
+  char proc_name[64];
+  long majflt, minflt, user_time, sys_time;
+  size_t njt_user_time;
+
+  tid = Thread::current()->osthread()->thread_id();
+
+  // Get non-jthread stats
+  snprintf(proc_name, 64, "/proc/self/task/%d/stat", tid);
+  proc_majflt_minflt_and_cputime(proc_name, &majflt, &minflt, &user_time, &sys_time);
+  njt_user_time = (size_t)user_time;
+
+  return njt_user_time;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // time support
 double os::elapsedVTime() {

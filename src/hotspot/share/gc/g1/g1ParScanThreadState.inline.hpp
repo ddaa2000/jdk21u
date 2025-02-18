@@ -50,10 +50,12 @@ void G1ParScanThreadState::trim_queue_partially() {
   }
 
   const Ticks start = Ticks::now();
+  const size_t start_user = os::get_cur_thread_usertime();
   trim_queue_to_threshold(_stack_trim_lower_threshold);
   assert(_task_queue->overflow_empty(), "invariant");
   assert(_task_queue->size() <= _stack_trim_lower_threshold, "invariant");
   _trim_ticks += Ticks::now() - start;
+  _trim_ticks_user += os::get_cur_thread_usertime() - start_user;
 }
 
 void G1ParScanThreadState::trim_queue() {
@@ -66,8 +68,13 @@ inline Tickspan G1ParScanThreadState::trim_ticks() const {
   return _trim_ticks;
 }
 
+inline long G1ParScanThreadState::trim_ticks_user() const {
+  return _trim_ticks_user;
+}
+
 inline void G1ParScanThreadState::reset_trim_ticks() {
   _trim_ticks = Tickspan();
+  _trim_ticks_user = 0;
 }
 
 template <typename T>

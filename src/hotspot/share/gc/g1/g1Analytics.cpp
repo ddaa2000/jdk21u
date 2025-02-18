@@ -81,6 +81,9 @@ G1Analytics::G1Analytics(const G1Predictions* predictor) :
     _cost_per_card_scan_ms_seq(TruncatedSeqLength),
     _cost_per_card_merge_ms_seq(TruncatedSeqLength),
     _cost_per_byte_copied_ms_seq(TruncatedSeqLength),
+    _cost_per_card_scan_user_seq(TruncatedSeqLength),
+    _cost_per_card_merge_cpu_seq(TruncatedSeqLength),
+    _cost_per_byte_copied_user_seq(TruncatedSeqLength),
     _pending_cards_seq(TruncatedSeqLength),
     _rs_length_seq(TruncatedSeqLength),
     _constant_other_time_ms_seq(TruncatedSeqLength),
@@ -103,8 +106,12 @@ G1Analytics::G1Analytics(const G1Predictions* predictor) :
 
   _card_scan_to_merge_ratio_seq.set_initial(young_card_scan_to_merge_ratio_defaults[index]);
   _cost_per_card_scan_ms_seq.set_initial(young_only_cost_per_card_scan_ms_defaults[index]);
+  _cost_per_card_scan_user_seq.set_initial(young_only_cost_per_card_scan_ms_defaults[index]);
+
   _rs_length_seq.set_initial(0);
   _cost_per_byte_copied_ms_seq.set_initial(cost_per_byte_ms_defaults[index]);
+  _cost_per_byte_copied_user_seq.set_initial(cost_per_byte_ms_defaults[index]);
+
 
   _constant_other_time_ms_seq.add(constant_other_time_ms_defaults[index]);
   _young_other_cost_per_region_ms_seq.add(young_other_cost_per_region_ms_defaults[index]);
@@ -186,12 +193,24 @@ void G1Analytics::report_cost_per_card_merge_ms(double cost_per_card_ms, bool fo
   _cost_per_card_merge_ms_seq.add(cost_per_card_ms, for_young_only_phase);
 }
 
+void G1Analytics::report_cost_per_card_scan_user(double cost_per_card_cpu, bool for_young_only_phase) {
+  _cost_per_card_scan_user_seq.add(cost_per_card_cpu, for_young_only_phase);
+}
+
+void G1Analytics::report_cost_per_card_merge_ms(double cost_per_card_cpu, bool for_young_only_phase) {
+  _cost_per_card_merge_cpu_seq.add(cost_per_card_cpu, for_young_only_phase);
+}
+
 void G1Analytics::report_card_scan_to_merge_ratio(double merge_to_scan_ratio, bool for_young_only_phase) {
   _card_scan_to_merge_ratio_seq.add(merge_to_scan_ratio, for_young_only_phase);
 }
 
 void G1Analytics::report_cost_per_byte_ms(double cost_per_byte_ms, bool for_young_only_phase) {
   _cost_per_byte_copied_ms_seq.add(cost_per_byte_ms, for_young_only_phase);
+}
+
+void G1Analytics::report_cost_per_byte_cpu(double cost_per_byte_cpu, bool for_young_only_phase) {
+  _cost_per_byte_copied_user_seq.add(cost_per_byte_cpu, for_young_only_phase);
 }
 
 void G1Analytics::report_young_other_cost_per_region_ms(double other_cost_per_region_ms) {

@@ -517,11 +517,13 @@ void G1YoungCollector::pre_evacuate_collection_set(G1EvacInfo* evacuation_info) 
 
 class G1ParEvacuateFollowersClosure : public VoidClosure {
   double _start_term;
+  size_t _start_term_user;
   double _term_time;
+  size_t _term_time_user;
   size_t _term_attempts;
 
-  void start_term_time() { _term_attempts++; _start_term = os::elapsedTime(); }
-  void end_term_time() { _term_time += (os::elapsedTime() - _start_term); }
+  void start_term_time() { _term_attempts++; _start_term = os::elapsedTime(); _start_term_user = os::get_cur_thread_usertime(); }
+  void end_term_time() { _term_time += (os::elapsedTime() - _start_term); _term_time_user += (os::get_cur_thread_usertime() - _start_term_user); }
 
   G1CollectedHeap*              _g1h;
   G1ParScanThreadState*         _par_scan_state;
@@ -549,7 +551,7 @@ public:
                                 G1ScannerTasksQueueSet* queues,
                                 TaskTerminator* terminator,
                                 G1GCPhaseTimes::GCParPhases phase)
-    : _start_term(0.0), _term_time(0.0), _term_attempts(0),
+    : _start_term(0.0), _start_term_user(0), _term_time(0.0), _term_time_user(0), _term_attempts(0),
       _g1h(g1h), _par_scan_state(par_scan_state),
       _queues(queues), _terminator(terminator), _phase(phase) {}
 
@@ -566,6 +568,7 @@ public:
   }
 
   double term_time() const { return _term_time; }
+  long term_time_user() const { return _term_time_user; }
   size_t term_attempts() const { return _term_attempts; }
 };
 
@@ -584,13 +587,16 @@ protected:
     G1GCPhaseTimes* p = _g1h->phase_times();
 
     Ticks start = Ticks::now();
+    size_t start_user = os::get_cur_thread_usertime();
     G1ParEvacuateFollowersClosure cl(_g1h, pss, _task_queues, &_terminator, objcopy_phase);
     cl.do_void();
 
     assert(pss->queue_is_empty(), "should be empty");
 
     Tickspan evac_time = (Ticks::now() - start);
+    size_t evac_time_user = os::get_cur_thread_usertime() - start_user;
     p->record_or_add_time_secs(objcopy_phase, worker_id, evac_time.seconds() - cl.term_time());
+    p->record_or_add_thread_work_item(objcopy_phase, worker_id, evac_time_user - cl.term_time_user());
 
     if (termination_phase == G1GCPhaseTimes::Termination) {
       p->record_time_secs(termination_phase, worker_id, cl.term_time());

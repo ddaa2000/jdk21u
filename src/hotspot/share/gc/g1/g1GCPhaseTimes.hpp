@@ -129,6 +129,10 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
     ScanHRUsedMemory
   };
 
+  enum GCCPUTimeItems {
+    UserTime
+  };
+
   enum GCMergeLBWorkItems {
     MergeLBDirtyCards,
     MergeLBSkippedCards
@@ -408,9 +412,12 @@ class G1EvacPhaseWithTrimTimeTracker : public StackObj {
   Tickspan& _total_time;
   Tickspan& _trim_time;
 
+  size_t& _total_time_user;
+  size_t& _trim_time_user;
+
   bool _stopped;
 public:
-  G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time);
+  G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time, size_t& total_time_user, size_t& trim_time_user);
   ~G1EvacPhaseWithTrimTimeTracker();
 
   void stop();
