@@ -1545,9 +1545,10 @@ static inline void proc_cputime_nano(const char* fname, size_t* user_time, size_
 
   count = sscanf(s,"%c %d %d %d %d %d %lu %lu %lu %lu %lu %lu %lu",
                  &cdummy, &idummy, &idummy, &idummy, &idummy, &idummy,
-                 &ldummy, minflt, &ldummy, majflt, &ldummy,
+                 &ldummy, &ldummy, &ldummy, &ldummy, &ldummy,
                  user_time, sys_time);
   if (count != 15 - 2) return ;
+  log_info(gc)("proc_cpu_nano %lu %d", *user_time, clock_tics_per_sec);
   *user_time = (size_t)(*user_time * (1000 * 1000 * 1000.0 / clock_tics_per_sec));
   *sys_time = (size_t)(*sys_time * (1000 * 1000 * 1000.0 / clock_tics_per_sec));
 }
@@ -1651,9 +1652,19 @@ size_t os::get_cur_thread_usertime() {
   tid = Thread::current()->osthread()->thread_id();
 
   // Get non-jthread stats
-  snprintf(proc_name, 64, "/proc/self/task/%d/stat", tid);
-  proc_cputime_nano(proc_name, &user_time, &sys_time);
-  njt_user_time = (size_t)user_time;
+  // snprintf(proc_name, 64, "/proc/self/task/%d/stat", tid);
+  // proc_cputime_nano(proc_name, &user_time, &sys_time);
+  struct rusage usage;
+  int retval = getrusage(RUSAGE_THREAD, &usage);
+  if(retval != 0){
+    ShouldNotReachHere();
+    // log_info(gc)("reached");
+    // return 0;
+  }
+  njt_user_time = usage.ru_utime.tv_sec * 1000UL * 1000 + usage.ru_utime.tv_usec;
+  // log_info(gc)("get_cur_thread_usertime: %lu", njt_user_time);
+
+  // njt_user_time = (size_t)user_time;
 
   return njt_user_time;
 }

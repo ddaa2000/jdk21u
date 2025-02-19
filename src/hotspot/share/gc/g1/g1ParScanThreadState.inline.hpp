@@ -57,7 +57,7 @@ void G1ParScanThreadState::trim_queue_partially() {
   _trim_ticks += Ticks::now() - start;
   size_t delta_time = os::get_cur_thread_usertime() - start_user;
   _trim_ticks_user += delta_time;
-  log_info(gc)("triming time: %lu", delta_time);
+  // log_info(gc)("triming time: %lu", delta_time);
 }
 
 void G1ParScanThreadState::trim_queue() {
