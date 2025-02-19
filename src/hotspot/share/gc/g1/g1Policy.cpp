@@ -845,8 +845,8 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
       log_info(gc)("cost_per_card_scan: %lf", avg_time_dirty_card_scan * 1000.0 / total_cards_scanned);
 
     } else {
-      log_info(gc)("cost_per_card_scan_user: %lf", 0.0);
-      log_info(gc)("cost_per_card_scan: %lf", 0.0);
+      log_info(gc)("cost_per_card_scan_user: %lf", -1.0);
+      log_info(gc)("cost_per_card_scan: %lf", -1.0);
     }
 
     // Update prediction for the ratio between cards from the remembered
@@ -871,8 +871,8 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
       log_info(gc)("cost_per_copied_byte_time: %lf", cost_per_byte_ms * 1000.0);
       
     } else {
-      log_info(gc)("cost_per_copied_byte_user: %lf", 0.0);
-      log_info(gc)("cost_per_copied_byte_time: %lf", 0.0);
+      log_info(gc)("cost_per_copied_byte_user: %lf", -1.0);
+      log_info(gc)("cost_per_copied_byte_time: %lf", -1.0);
     }
 
     if (_collection_set->young_region_length() > 0) {
