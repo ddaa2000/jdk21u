@@ -308,6 +308,14 @@ size_t G1GCPhaseTimes::sum_thread_work_items(GCParPhases phase, uint index) {
   return _gc_par_phases[phase]->thread_work_items(index)->sum();
 }
 
+size_t G1GCPhaseTimes::avg_thread_work_items(GCParPhases phase, uint index) {
+  if (_gc_par_phases[phase] == nullptr) {
+    return 0;
+  }
+  assert(_gc_par_phases[phase]->thread_work_items(index) != nullptr, "No sub count");
+  return _gc_par_phases[phase]->thread_work_items(index)->average(); // in nanoseconds
+}
+
 template <class T>
 void G1GCPhaseTimes::details(T* phase, uint indent_level) const {
   LogTarget(Trace, gc, phases, task) lt;
@@ -651,6 +659,7 @@ G1EvacPhaseTimesTracker::~G1EvacPhaseTimesTracker() {
     // Exclude trim time by increasing the start time.
     _start_time += _trim_time;
     _phase_times->record_or_add_time_secs(G1GCPhaseTimes::ObjCopy, _worker_id, _trim_time.seconds());
+    _phase_times->record_or_add_thread_work_item(G1GCPhaseTimes::ObjCopy, _worker_id, _trim_time_user, G1GCPhaseTimes::UserTime);
   }
 }
 

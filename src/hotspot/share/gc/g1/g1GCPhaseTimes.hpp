@@ -270,6 +270,8 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
 
   size_t sum_thread_work_items(GCParPhases phase, uint index = 0);
 
+  size_t avg_thread_work_items(GCParPhases phase, uint index);
+
   void record_pre_evacuate_prepare_time_ms(double ms) {
     _cur_pre_evacuate_prepare_time_ms = ms;
   }
