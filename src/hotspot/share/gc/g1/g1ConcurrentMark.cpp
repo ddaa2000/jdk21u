@@ -87,27 +87,10 @@ bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
   // We move that task's local finger along.
   _task->move_finger_to(addr);
 
-  size_t page_id = ((size_t)addr - SEMERU_START_ADDR)/4096;
-  bool page_likely_local = G1CollectedHeap::heap()->user_buf->page_stats[page_id] == 0;
-
-
-  if(!_cm->is_marked_in_black_bitmap(cast_to_oop(addr))){
-    if(page_likely_local){
-      _task->_count_bitmap_page_local += 1;
-    } else {
-      _task->_count_bitmap_page_remote += 1;
-    }
-
-    _task->scan_task_entry(G1TaskQueueEntry::from_oop(cast_to_oop(addr)));
-    // we only partially drain the local queue and global stack
-    _task->drain_local_queue(true);
-    _task->drain_global_stack(true);
-  } else {
-    // log_info(gc)("ignore black");
-    // ShouldNotReachHere();
-  }
-
-
+  _task->scan_task_entry(G1TaskQueueEntry::from_oop(cast_to_oop(addr)));
+  // we only partially drain the local queue and global stack
+  _task->drain_local_queue(true);
+  _task->drain_global_stack(true);
 
   // if the has_aborted flag has been raised, we need to bail out of
   // the iteration
@@ -505,9 +488,6 @@ void G1ConcurrentMark::clear_statistics(HeapRegion* r) {
   }
   _top_at_rebuild_starts[region_idx] = nullptr;
   _region_mark_stats[region_idx].clear();
-
-   // Haoran: modify
-  _g1h->concurrent_prefetch()->clear_statistics_in_region(region_idx);
 }
 
 void G1ConcurrentMark::humongous_object_eagerly_reclaimed(HeapRegion* r) {
@@ -789,7 +769,6 @@ public:
 void G1PreConcurrentStartTask::ResetMarkingStateTask::do_work(uint worker_id) {
   // Reset marking state.
   _cm->reset();
-  _pf->reset();
 }
 
 class NoteStartOfMarkHRClosure : public HeapRegionClosure {
@@ -835,20 +814,10 @@ void G1ConcurrentMark::post_concurrent_mark_start() {
   rp->start_discovery(false /* always_clear */);
 
   SATBMarkQueueSet& satb_mq_set = G1BarrierSet::satb_mark_queue_set();
-  PrefetchQueueSet& prefetch_mq_set = _g1h->prefetch_queue_set();
-
   // This is the start of  the marking cycle, we're expected all
   // threads to have SATB queues with active set to false.
-  prefetch_mq_set.abandon_partial_marking();
-
   satb_mq_set.set_active_all_threads(true, /* new active value */
                                      false /* expected_active */);
-
-  //hua: todo check whether other states are synced with satb
-  // Haoran: modify
-  prefetch_mq_set.set_active_all_threads(true, /* new active value */
-                    false /* expected_active */);
-
 
   _root_regions.prepare_for_scan();
 
@@ -922,7 +891,6 @@ public:
       assert(worker_id < _cm->active_tasks(), "invariant");
 
       G1CMTask* task = _cm->task(worker_id);
-      task->clear_memliner_stats();
       task->record_start_time();
       if (!_cm->has_aborted()) {
         do {
@@ -934,7 +902,6 @@ public:
         } while (!_cm->has_aborted() && task->has_aborted());
       }
       task->record_end_time();
-      task->print_memliner_stats();
       guarantee(!task->has_aborted() || _cm->has_aborted(), "invariant");
     }
 
@@ -1094,29 +1061,10 @@ void G1ConcurrentMark::mark_from_roots() {
 
   // Parallel task terminator is set in "set_concurrency_and_phase()"
   set_concurrency_and_phase(active_workers, true /* concurrent */);
-  set_in_conc_mark_from_roots(true);
-
-  {
-    MutexLocker pl(CPF_lock, Mutex::_no_safepoint_check_flag);
-    // Haoran: modify
-    G1CollectedHeap::heap()->_pf_thread->start_full_mark();
-    CPF_lock->notify();
-  }
 
   G1CMConcurrentMarkingTask marking_task(this);
   _concurrent_workers->run_task(&marking_task);
   print_stats();
-
-  set_in_conc_mark_from_roots(false);
-  {
-    log_info(gc)("before CCM mark from roots finish");
-    MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-    while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-      ml.wait();
-    }
-    log_info(gc)("after CCM mark from roots finish");
-
-  }
 }
 
 const char* G1ConcurrentMark::verify_location_string(VerifyLocation location) {
@@ -1327,21 +1275,9 @@ void G1ConcurrentMark::remark() {
     satb_mq_set.set_active_all_threads(false, /* new active value */
                                        true /* expected_active */);
 
-    // Haoran: modify
-    PrefetchQueueSet& prefetch_mq_set = _g1h->prefetch_queue_set();
-    // We're done with marking.
-    // This is the end of the marking cycle, we're expected all
-    // threads to have SATB queues with active set to true.
-    prefetch_mq_set.set_active_all_threads(false, /* new active value */
-                    true /* expected_active */);
-    prefetch_mq_set.abandon_partial_marking();
-
-
     {
       GCTraceTime(Debug, gc, phases) debug("Flush Task Caches", _gc_timer_cm);
       flush_all_task_caches();
-      // Haoran: modify
-      _g1h->concurrent_prefetch()->flush_all_task_caches();
     }
 
     // All marking completed. Check bitmap now as we will start to reset TAMSes
@@ -2097,18 +2033,6 @@ bool G1ConcurrentMark::concurrent_cycle_abort() {
   // the expected_active value from the SATB queue set.
   satb_mq_set.set_active_all_threads(false, /* new active value */
                                      satb_mq_set.is_active() /* expected_active */);
-
-  
-  // Haoran: modify
-  G1PrefetchQueueSet& pq_set = G1CollectedHeap::heap()->prefetch_queue_set();
-  // pq_set.abandon_partial_marking();
-  // This can be called either during or outside marking, we'll read
-  // the expected_active value from the SATB queue set.
-  pq_set.set_active_all_threads(
-                                 false, /* new active value */
-                                 pq_set.is_active() /* expected_active */);
-  pq_set.abandon_partial_marking();
-
   return true;
 }
 
@@ -2159,9 +2083,6 @@ void G1ConcurrentMark::threads_do(ThreadClosure* tc) const {
 void G1ConcurrentMark::print_on_error(outputStream* st) const {
   st->print_cr("Marking Bits: (CMBitMap*) " PTR_FORMAT, p2i(mark_bitmap()));
   _mark_bitmap.print_on_error(st, " Bits: ");
-  st->print_cr("Marking Black Bits: (CMBitMap*) " PTR_FORMAT, p2i(mark_black_bitmap()));
-  _mark_black_bitmap.print_on_error(st, " Bits: ");
-
 }
 
 static ReferenceProcessor* get_cm_oop_closure_ref_processor(G1CollectedHeap* g1h) {
@@ -2917,26 +2838,11 @@ void G1CMTask::do_marking_step(double time_target_ms,
       if (!is_serial) {
         // We only need to enter the sync barrier if being called
         // from a parallel context
-        if( _worker_id == 0){
-          log_info(gc)("before CCM overflow handle");
-          MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-          while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-            ml.wait();
-          }
-          log_info(gc)("after CCM overflow handle");
-        }
         _cm->enter_first_sync_barrier(_worker_id);
 
         // When we exit this sync barrier we know that all tasks have
         // stopped doing marking work. So, it's now safe to
         // re-initialize our data structures.
-      } else {
-        log_info(gc)("before CCM overflow handle");
-        MonitorLocker ml(CCM_finish_lock, Mutex::_no_safepoint_check_flag);
-        while(!G1CollectedHeap::heap()->_pf_thread->idle()){
-          ml.wait();
-        }
-        log_info(gc)("after CCM overflow handle");
       }
 
       clear_region_fields();

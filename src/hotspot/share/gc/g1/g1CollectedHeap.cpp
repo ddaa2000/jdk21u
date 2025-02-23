@@ -1554,12 +1554,12 @@ jint G1CollectedHeap::initialize() {
   _cm_thread = _cm->cm_thread();
 
     // Haoran: modify
-  _pf = new G1ConcurrentPrefetch(this, _cm);
-  // if (_cm == NULL || !_cm->completed_initialization()) {
-  //   vm_shutdown_during_initialization("Could not create/initialize G1ConcurrentMark");
-  //   return JNI_ENOMEM;
-  // }
-  _pf_thread = _pf->pf_thread();
+//  _pf = new G1ConcurrentPrefetch(this, _cm);
+//  // if (_cm == NULL || !_cm->completed_initialization()) {
+//  //   vm_shutdown_during_initialization("Could not create/initialize G1ConcurrentMark");
+//  //   return JNI_ENOMEM;
+//  // }
+//  _pf_thread = _pf->pf_thread();
 
 
   // Now expand into the initial heap size.
