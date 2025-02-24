@@ -40,11 +40,13 @@ private:
   G1DirtyCardQueue _dirty_card_queue;
 
   PrefetchQueue  _prefetch_queue;
+  size_t _load_count;
 
   G1ThreadLocalData() :
       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
       _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()),
-      _prefetch_queue(&(((G1CollectedHeap*)Universe::heap())->prefetch_queue_set())) {}
+      _prefetch_queue(&(((G1CollectedHeap*)Universe::heap())->prefetch_queue_set())),
+      _load_count(0) {}
 
   static G1ThreadLocalData* data(Thread* thread) {
     assert(UseG1GC, "Sanity");
@@ -115,6 +117,10 @@ public:
 
   static ByteSize prefetch_queue_buffer_offset() {
     return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_buf();
+  }
+
+  static ByteSize load_count_offset() {
+    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _load_count);
   }
 };
 

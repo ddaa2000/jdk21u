@@ -203,81 +203,27 @@ Node* G1BarrierSetC2::prefetch_load_barrier(GraphKit* kit,
   float likely  = PROB_LIKELY(0.999);
   float unlikely  = PROB_UNLIKELY(0.999);
 
-  BasicType active_type = in_bytes(SATBMarkQueue::byte_width_of_active()) == 4 ? T_INT : T_BYTE;
-  // assert(in_bytes(SATBMarkQueue::byte_width_of_active()) == 4 || in_bytes(SATBMarkQueue::byte_width_of_active()) == 1, "flag width");
-
-  // Offsets into the thread
-  // const int marking_offset = in_bytes(G1ThreadLocalData::satb_mark_queue_active_offset());
-  // const int index_offset   = in_bytes(G1ThreadLocalData::satb_mark_queue_index_offset());
-  // const int buffer_offset  = in_bytes(G1ThreadLocalData::satb_mark_queue_buffer_offset());
-
-  // Now the actual pointers into the thread
-  // Node* marking_adr = __ AddP(no_base, tls, __ ConX(marking_offset));
-  // Node* buffer_adr  = __ AddP(no_base, tls, __ ConX(buffer_offset));
-  // Node* index_adr   = __ AddP(no_base, tls, __ ConX(index_offset));
 
 
-  // Haoran: modify
-  const int prefetch_marking_offset = in_bytes(G1ThreadLocalData::prefetch_queue_active_offset());
-  const int prefetch_index_offset   = in_bytes(G1ThreadLocalData::prefetch_queue_index_offset());
-  const int prefetch_buffer_offset  = in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset());
-  Node* prefetch_marking_adr = __ AddP(no_base, tls, __ ConX(prefetch_marking_offset));
-  Node* prefetch_buffer_adr  = __ AddP(no_base, tls, __ ConX(prefetch_buffer_offset));
-  Node* prefetch_index_adr   = __ AddP(no_base, tls, __ ConX(prefetch_index_offset));
+  __ addl(load_count_index, 1);
+  __ andl(load_count_index, 0xFF);
+  __ jcc(Assembler::notZero, *prefetch_done);
 
-  Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
+//  Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
+  
 
   // if (!marking)
-  __ if_then(prefetch_marking, BoolTest::ne, zero, unlikely); {
-    BasicType index_bt = TypeX_X->basic_type();
-    assert(sizeof(size_t) == type2aelembytes(index_bt), "Loading G1 PrefetchQueue::_index with wrong size.");
-    // val = __ load(__ ctrl(), adr, val_type, bt, alias_idx);
-    // if (pre_val != NULL)
-    __ if_then(obj, BoolTest::ne, kit->null()); {
-      // const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-      // __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), "write_ref_field_prefetch_entry", val, tls);
-      
-      
-      // Convert the store obj pointer to an int prior to doing math on it
-      // Must use ctrl to prevent "integerized oop" existing across safepoint
-      Node* prefetch_cast =  __ CastPX(__ ctrl(), obj);
+  __ if_then(obj, BoolTest::ne, kit->null()); {
+    const int load_count_offset = in_bytes(G1ThreadLocalData::load_count());
+    Node* load_count_addr = __ AddP(no_base, tls, __ConX(load_count_offset));
+    Node* load_count_val = __ load(__ ctrl(), load_count_addr, TypeX_X, TypeX_X->basic_type(), Compile::AliasIdxRaw);
+    Node* load_count_new_val = kit->gvn().transform(new SubXNode(load_count_val, __ ConX(1)));
+    Node* load_count_new_val_masked = kit->gvn().transform(new AndXNode(load_count_new_val, __ ConX(0xFF)));
+    __ store(__ ctrl(), pload_count_addr, load_count_new_val, TypeX_X->basic_type(), Compile::AliasIdxRaw, MemNode::unordered);
 
-      // Divide pointer by card size
-      Node* prefetch_card_offset = __ URShiftX( prefetch_cast, __ ConI(CardTable::card_shift()) );
-
-      // Combine card table base and card offset
-      Node* prefetch_card_adr = __ AddP(no_base, byte_map_base_node(kit), prefetch_card_offset );
-      Node* young_card = __ ConI((jint)G1CardTable::g1_young_card_val());
-
-      Node* prefetch_card_val = __ load(__ ctrl(), prefetch_card_adr, TypeInt::INT, T_BYTE, Compile::AliasIdxRaw);
-      __ if_then(prefetch_card_val, BoolTest::ne, young_card); {
-
-        Node* prefetch_index   = __ load(__ ctrl(), prefetch_index_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
-        Node* prefetch_buffer  = __ load(__ ctrl(), prefetch_buffer_adr, TypeRawPtr::NOTNULL, T_ADDRESS, Compile::AliasIdxRaw);
-        // is the queue for this thread full?
-        __ if_then(prefetch_index, BoolTest::ne, zeroX, likely); {
-          // decrement the index
-          Node* prefetch_next_index = kit->gvn().transform(new SubXNode(prefetch_index, __ ConX(sizeof(intptr_t))));
-          // Now get the buffer location we will log the previous value into and store it
-          Node *prefetch_log_addr = __ AddP(no_base, prefetch_buffer, prefetch_next_index);
-          __ store(__ ctrl(), prefetch_log_addr, obj, T_OBJECT, Compile::AliasIdxRaw, MemNode::release);
-          // update the index
-          __ store(__ ctrl(), prefetch_index_adr, prefetch_next_index, index_bt, Compile::AliasIdxRaw, MemNode::release);
-        } __ else_(); {
-          // logging buffer is full, call the runtime
-          const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-          __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", obj, tls);
-        } __ end_if();  // (!index)
-
-      } __ end_if();
-      
-      
-
-
-      // Useless variables, just want to pretouch
-      // prefetch_index_adr = __ AddP(zeroX, val, zeroX);
-      // prefetch_marking_adr = __ load(__ ctrl(), prefetch_index_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
-
+    __ if_then(load_count_new_val_masked, BoolTest::eq, zero, unlikely); {
+      const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
+      __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", obj, tls);
     } __ end_if();  // (val != NULL)
   } __ end_if();  // (!marking)
 
@@ -345,77 +291,6 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
   Node* marking_adr = __ AddP(no_base, tls, __ ConX(marking_offset));
   Node* buffer_adr  = __ AddP(no_base, tls, __ ConX(buffer_offset));
   Node* index_adr   = __ AddP(no_base, tls, __ ConX(index_offset));
-
-
-  if (do_load && val != NULL) {
-    // Haoran: modify
-    const int prefetch_marking_offset = in_bytes(G1ThreadLocalData::prefetch_queue_active_offset());
-    const int prefetch_index_offset   = in_bytes(G1ThreadLocalData::prefetch_queue_index_offset());
-    const int prefetch_buffer_offset  = in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset());
-    Node* prefetch_marking_adr = __ AddP(no_base, tls, __ ConX(prefetch_marking_offset));
-    Node* prefetch_buffer_adr  = __ AddP(no_base, tls, __ ConX(prefetch_buffer_offset));
-    Node* prefetch_index_adr   = __ AddP(no_base, tls, __ ConX(prefetch_index_offset));
-
-    Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
-
-
-
-
-
-    // if (!marking)
-    __ if_then(prefetch_marking, BoolTest::ne, zero, unlikely); {
-      BasicType index_bt = TypeX_X->basic_type();
-      assert(sizeof(size_t) == type2aelembytes(index_bt), "Loading G1 PrefetchQueue::_index with wrong size.");
-      // val = __ load(__ ctrl(), adr, val_type, bt, alias_idx);
-      // if (pre_val != NULL)
-      __ if_then(val, BoolTest::ne, kit->null()); {
-        // const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-        // __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry), "write_ref_field_prefetch_entry", val, tls);
-        
-        
-        // Convert the store obj pointer to an int prior to doing math on it
-        // Must use ctrl to prevent "integerized oop" existing across safepoint
-        Node* prefetch_cast =  __ CastPX(__ ctrl(), val);
-
-        // Divide pointer by card size
-        Node* prefetch_card_offset = __ URShiftX( prefetch_cast, __ ConI(CardTable::card_shift()) );
-
-        // Combine card table base and card offset
-        Node* prefetch_card_adr = __ AddP(no_base, byte_map_base_node(kit), prefetch_card_offset );
-        Node* young_card = __ ConI((jint)G1CardTable::g1_young_card_val());
-
-        Node* prefetch_card_val = __ load(__ ctrl(), prefetch_card_adr, TypeInt::INT, T_BYTE, Compile::AliasIdxRaw);
-        __ if_then(prefetch_card_val, BoolTest::ne, young_card); {
-
-          Node* prefetch_index   = __ load(__ ctrl(), prefetch_index_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
-          Node* prefetch_buffer  = __ load(__ ctrl(), prefetch_buffer_adr, TypeRawPtr::NOTNULL, T_ADDRESS, Compile::AliasIdxRaw);
-          // is the queue for this thread full?
-          __ if_then(prefetch_index, BoolTest::ne, zeroX, likely); {
-            // decrement the index
-            Node* prefetch_next_index = kit->gvn().transform(new SubXNode(prefetch_index, __ ConX(sizeof(intptr_t))));
-            // Now get the buffer location we will log the previous value into and store it
-            Node *prefetch_log_addr = __ AddP(no_base, prefetch_buffer, prefetch_next_index);
-            __ store(__ ctrl(), prefetch_log_addr, val, T_OBJECT, Compile::AliasIdxRaw, MemNode::unordered);
-            // update the index
-            __ store(__ ctrl(), prefetch_index_adr, prefetch_next_index, index_bt, Compile::AliasIdxRaw, MemNode::unordered);
-          } __ else_(); {
-            // logging buffer is full, call the runtime
-            const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
-            __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", val, tls);
-          } __ end_if();  // (!index)
-
-        } __ end_if();
-        
-        
-
-
-        // Useless variables, just want to pretouch
-        // prefetch_index_adr = __ AddP(zeroX, val, zeroX);
-        // prefetch_marking_adr = __ load(__ ctrl(), prefetch_index_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
-
-      } __ end_if();  // (val != NULL)
-    } __ end_if();  // (!marking)
-  }
 
   // Now some of the values
   Node* marking = __ load(__ ctrl(), marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
