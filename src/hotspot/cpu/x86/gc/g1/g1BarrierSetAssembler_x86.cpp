@@ -813,7 +813,7 @@ void G1BarrierSetAssembler::generate_c1_prefetch_barrier_runtime_stub(StubAssemb
   Address load_count_index(thread, in_bytes(G1ThreadLocalData::load_count_offset()));
   __ addq(load_count_index, 1);
   __ andq(load_count_index, 0xFF);
-  __ jcc(Assembler::notZero, *prefetch_done);
+  __ jcc(Assembler::notZero, prefetch_done);
 
   __ bind(prefetch_runtime);
   __ push(rax);

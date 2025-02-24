@@ -203,23 +203,17 @@ Node* G1BarrierSetC2::prefetch_load_barrier(GraphKit* kit,
   float likely  = PROB_LIKELY(0.999);
   float unlikely  = PROB_UNLIKELY(0.999);
 
-
-
-  __ addl(load_count_index, 1);
-  __ andl(load_count_index, 0xFF);
-  __ jcc(Assembler::notZero, *prefetch_done);
-
 //  Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
   
 
   // if (!marking)
   __ if_then(obj, BoolTest::ne, kit->null()); {
-    const int load_count_offset = in_bytes(G1ThreadLocalData::load_count());
-    Node* load_count_addr = __ AddP(no_base, tls, __ConX(load_count_offset));
+    const int load_count_offset = in_bytes(G1ThreadLocalData::load_count_offset());
+    Node* load_count_addr = __ AddP(no_base, tls, __ ConX(load_count_offset));
     Node* load_count_val = __ load(__ ctrl(), load_count_addr, TypeX_X, TypeX_X->basic_type(), Compile::AliasIdxRaw);
     Node* load_count_new_val = kit->gvn().transform(new SubXNode(load_count_val, __ ConX(1)));
     Node* load_count_new_val_masked = kit->gvn().transform(new AndXNode(load_count_new_val, __ ConX(0xFF)));
-    __ store(__ ctrl(), pload_count_addr, load_count_new_val, TypeX_X->basic_type(), Compile::AliasIdxRaw, MemNode::unordered);
+    __ store(__ ctrl(), load_count_addr, load_count_new_val, TypeX_X->basic_type(), Compile::AliasIdxRaw, MemNode::unordered);
 
     __ if_then(load_count_new_val_masked, BoolTest::eq, zero, unlikely); {
       const TypeFunc *tf = write_ref_field_prefetch_entry_Type();

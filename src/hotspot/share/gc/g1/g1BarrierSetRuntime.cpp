@@ -68,15 +68,18 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_asm(oopDesc* 
   assert(thread == JavaThread::current(), "pre-condition");
   assert(new_val != nullptr, "should be optimized out");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  log_info(gc)("load asm");
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1(oopDesc* new_val, JavaThread* thread))
   assert(thread == JavaThread::current(), "pre-condition");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  log_info(gc)("load c1");
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread))
   assert(thread == JavaThread::current(), "pre-condition");
   assert(new_val != nullptr, "should be optimized out");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  log_info(gc)("load c2");
 JRT_END
