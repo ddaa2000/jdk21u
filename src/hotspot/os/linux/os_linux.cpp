@@ -1629,7 +1629,7 @@ long os::get_accum_thread_usertime() {
   pid_t tid;
   char proc_name[64];
   long majflt, minflt, user_time, sys_time;
-  long njt_user_time;
+  long njt_user_time = 0;
 
   // Get non-jthread stats
   for (NonJavaThread::Iterator njti; !njti.end(); njti.step()) {
@@ -1661,8 +1661,10 @@ size_t os::get_cur_thread_usertime() {
     // log_info(gc)("reached");
     // return 0;
   }
+  // in microseconds
   njt_user_time = usage.ru_utime.tv_sec * 1000UL * 1000 + usage.ru_utime.tv_usec;
   // log_info(gc)("get_cur_thread_usertime: %lu", njt_user_time);
+  if(njt_user_time == 0) log_info(gc) ("get_cur_thread_usertime: %lu", njt_user_time);
 
   // njt_user_time = (size_t)user_time;
 

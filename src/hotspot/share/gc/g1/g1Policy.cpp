@@ -743,6 +743,11 @@ double G1Policy::logged_cards_processing_time() const {
 #define MIN_TIMER_GRANULARITY 0.0000001
 
 void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mark, bool evacuation_failure) {
+  this->_g1h->scan_cards.store(0);
+  this->_g1h->scan_regions.store(0);
+  this->_g1h->scan_time.store(0.0);
+  this->_g1h->scan_time_user.store(0.0);
+
   G1GCPhaseTimes* p = phase_times();
 
   double start_time_sec = phase_times()->cur_collection_start_sec();
@@ -829,6 +834,7 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
     }
 
     // Update prediction for card scan
+    // ScanHRScannedCards only occured in G1RemSet::scan_heap_roots
     size_t const total_cards_scanned = p->sum_thread_work_items(G1GCPhaseTimes::ScanHR, G1GCPhaseTimes::ScanHRScannedCards) +
                                        p->sum_thread_work_items(G1GCPhaseTimes::OptScanHR, G1GCPhaseTimes::ScanHRScannedCards);
 
@@ -841,12 +847,14 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
       size_t total_user_time_card_scan = p->avg_thread_work_items(G1GCPhaseTimes::ScanHR, G1GCPhaseTimes::ScanHRUserTime) +
                                         p->avg_thread_work_items(G1GCPhaseTimes::OptScanHR, G1GCPhaseTimes::ScanHRUserTime);
       
+      log_info(gc)("user_time_dirty_card_scan: %lf", total_user_time_card_scan * 1.0);
+      log_info(gc)("time_dirty_card_scan: %lf", avg_time_dirty_card_scan * 1000.0);
       log_info(gc)("cost_per_card_scan_user: %lf", total_user_time_card_scan * 1.0 / total_cards_scanned);
       log_info(gc)("cost_per_card_scan: %lf", avg_time_dirty_card_scan * 1000.0 / total_cards_scanned);
 
     } else {
-      log_info(gc)("cost_per_card_scan_user: %lf", -1.0);
-      log_info(gc)("cost_per_card_scan: %lf", -1.0);
+      // log_info(gc)("cost_per_card_scan_user: %lf", -1.0);
+      // log_info(gc)("cost_per_card_scan: %lf", -1.0);
     }
 
     // Update prediction for the ratio between cards from the remembered
@@ -868,6 +876,8 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
       _analytics->report_cost_per_byte_ms(cost_per_byte_ms, is_young_only_pause);
 
       size_t obj_copy_user_time = p->avg_thread_work_items(G1GCPhaseTimes::ObjCopy, G1GCPhaseTimes::UserTime) + p->avg_thread_work_items(G1GCPhaseTimes::OptObjCopy, G1GCPhaseTimes::UserTime);
+      log_info(gc)("cost_time_user: %lfus", obj_copy_user_time * 1.0);
+      log_info(gc)("cost_time: %lfus", (average_time_ms(G1GCPhaseTimes::ObjCopy) + average_time_ms(G1GCPhaseTimes::OptObjCopy)) * 1000.0);
       log_info(gc)("cost_per_copied_byte_user: %lf", obj_copy_user_time * 1.0 / copied_bytes);
       log_info(gc)("cost_per_copied_byte_time: %lf", cost_per_byte_ms * 1000.0);
       

@@ -115,6 +115,7 @@
 #include "utilities/bitMap.inline.hpp"
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/stack.inline.hpp"
+#include <atomic>
 
 size_t G1CollectedHeap::_humongous_object_threshold_in_words = 0;
 
@@ -1296,6 +1297,10 @@ G1CollectedHeap::G1CollectedHeap() :
     G1ScannerTasksQueue* q = new G1ScannerTasksQueue();
     _task_queues->register_queue(i, q);
   }
+  std::atomic_init(&scan_cards, 0);
+  std::atomic_init(&scan_regions, 0);
+  std::atomic_init(&scan_time, 0.0);
+  std::atomic_init(&scan_time_user, 0.0);
 
   _gc_tracer_stw->initialize();
 

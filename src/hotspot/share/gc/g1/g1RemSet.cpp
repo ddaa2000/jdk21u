@@ -22,6 +22,7 @@
  *
  */
 
+#include "logging/log.hpp"
 #include "precompiled.hpp"
 #include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1BatchedTask.hpp"
@@ -547,6 +548,14 @@ class G1ScanHRForRegionClosure : public HeapRegionClosure {
     return scanned_to;
   }
 
+  void atomic_add(std::atomic<double>& atomic_double, double add) {
+    double old_val = atomic_double.load();
+    double new_val = old_val + add;
+    while (!atomic_double.compare_exchange_weak(old_val, new_val)) {
+        new_val = old_val + add;
+    }
+  }
+
   void do_claimed_block(uint const region_idx, CardValue* const dirty_l, CardValue* const dirty_r) {
     _ct->change_dirty_cards_to(dirty_l, dirty_r, _scanned_card_value);
     size_t num_cards = dirty_r - dirty_l;
@@ -563,8 +572,20 @@ class G1ScanHRForRegionClosure : public HeapRegionClosure {
       return;
     }
     MemRegion mr(MAX2(card_start, _scanned_to), scan_end);
+    const size_t start_user = os::get_cur_thread_usertime();
+    auto stt = Ticks::now();
     _scanned_to = scan_memregion(region_idx, mr);
+    auto used_time = Ticks::now() - stt;
+    auto used_time_user = os::get_cur_thread_usertime() - start_user;
 
+    this->_g1h->scan_cards += num_cards;
+    this->_g1h->scan_regions += 1;
+    atomic_add(this->_g1h->scan_time, used_time.microseconds() * 1.0);
+    atomic_add(this->_g1h->scan_time_user, used_time_user * 1.0);
+
+    if (this->_g1h->scan_regions.load() % 5 == 0) {
+      log_info(gc) ("[%u] scanned_regions: %lu, cost_card_scan_user: %lf, cost_per_card_scan_user: %lf; cost_card_scan: %lf, cost_per_card_scan: %lf", _worker_id, this->_g1h->scan_regions.load(), this->_g1h->scan_time_user.load(), this->_g1h->scan_time_user.load() / this->_g1h->scan_cards.load(), this->_g1h->scan_time.load(), this->_g1h->scan_time.load() / this->_g1h->scan_cards.load());
+    }
     _cards_scanned += num_cards;
   }
 
