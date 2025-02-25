@@ -40,6 +40,7 @@ private:
   G1DirtyCardQueue _dirty_card_queue;
 
   PrefetchQueue  _prefetch_queue;
+public:
   size_t _load_count;
 
   G1ThreadLocalData() :

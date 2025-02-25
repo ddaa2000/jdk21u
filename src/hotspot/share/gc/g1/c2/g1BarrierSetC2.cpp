@@ -207,15 +207,16 @@ Node* G1BarrierSetC2::prefetch_load_barrier(GraphKit* kit,
   
 
   // if (!marking)
+
   __ if_then(obj, BoolTest::ne, kit->null()); {
     const int load_count_offset = in_bytes(G1ThreadLocalData::load_count_offset());
     Node* load_count_addr = __ AddP(no_base, tls, __ ConX(load_count_offset));
     Node* load_count_val = __ load(__ ctrl(), load_count_addr, TypeX_X, TypeX_X->basic_type(), Compile::AliasIdxRaw);
-    Node* load_count_new_val = kit->gvn().transform(new SubXNode(load_count_val, __ ConX(1)));
-    Node* load_count_new_val_masked = kit->gvn().transform(new AndXNode(load_count_new_val, __ ConX(0xFF)));
+    Node* load_count_new_val = kit->gvn().transform(new AddXNode(load_count_val, __ ConX(1)));
     __ store(__ ctrl(), load_count_addr, load_count_new_val, TypeX_X->basic_type(), Compile::AliasIdxRaw, MemNode::unordered);
+    Node* load_count_new_val_masked = kit->gvn().transform(new AndXNode(load_count_new_val, __ ConX(0xFF)));
 
-    __ if_then(load_count_new_val_masked, BoolTest::eq, zero, unlikely); {
+    __ if_then(load_count_new_val_masked, BoolTest::eq, zeroX, unlikely); {
       const TypeFunc *tf = write_ref_field_prefetch_entry_Type();
       __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2), "write_ref_field_prefetch_entry_c2", obj, tls);
     } __ end_if();  // (val != NULL)
