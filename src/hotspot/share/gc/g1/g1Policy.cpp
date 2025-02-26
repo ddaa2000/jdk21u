@@ -1545,3 +1545,27 @@ void G1Policy::transfer_survivors_to_cset(const G1SurvivorRegions* survivors) {
   // the survivor regions from this evacuation pause as 'young'
   // at the start of the next.
 }
+
+class G1ClearBlockData : public HeapRegionClosure {
+
+public:
+  G1ClearBlockData() { }
+
+  bool do_heap_region(HeapRegion* r) override {
+    size_t num = 1 << 6;
+    size_t* block_visit = r->block_visit();
+    for(size_t i = 0; i < num; i++){
+      block_visit[i] = 0;
+    }
+    return false;
+  }
+};
+
+void reset_load_count(){
+  _young_load_count = 0;
+  _old_load_count = 0;
+  _total_load_count = 0;
+  G1ClearBlockData cl();
+  G1CollectedHeap::heap()->heap_region_iterate(&cl);
+}
+

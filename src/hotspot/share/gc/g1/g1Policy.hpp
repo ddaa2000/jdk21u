@@ -188,6 +188,28 @@ public:
     return _mmu_tracker->max_gc_time() * 1000.0;
   }
 
+inline void record_load(void* addr){
+  G1CollectedHeap* heap = G1CollectedHeap::heap();
+  HeapRegion* hr = heap->heap_region_containing(addr);
+  size_t* block_visit = hr->block_visit();
+
+  size_t present_total_load_count;
+  while(true){
+    present_total_load_count = _total_load_count;
+    size_t old_val =  Atomic::cmpxchg(&_total_load_count, present_total_load_count, present_total_load_count + 1);
+    if( old_val == present_total_load_count){
+      break;
+    }
+  }
+  size_t new_val = present_total_load_count + 1;
+
+
+  size_t offset = (size_t)(pointer_delta(addr, hr->bottom(), sizeof(uint8_t))) >> (LogOfHRGrainBytes - 6);
+  block_visit[offset] = new_val;
+}
+
+void reset_load_count();
+
 inline void inc_young_load_count(){
     Atomic::inc(&_young_load_count);
     size_t present_total_load_count;
@@ -212,12 +234,6 @@ inline void inc_old_load_count(){
       }
     }
     size_t new_val = present_total_load_count + 1;
-}
-
-inline void reset_load_count(){
-  _young_load_count = 0;
-  _old_load_count = 0;
-  _total_load_count = 0;
 }
 
 inline size_t get_young_load_count(){

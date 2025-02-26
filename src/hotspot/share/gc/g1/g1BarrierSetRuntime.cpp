@@ -73,11 +73,7 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_asm(oopDesc* 
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load asm");
   G1CollectedHeap* heap = G1CollectedHeap::heap();
-  if(heap->is_in_young(new_val)){
-    heap->policy()->inc_young_load_count();
-  } else {
-    heap->policy()->inc_old_load_count();
-  }
+  heap->policy()->record_load(new_val);
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1(oopDesc* new_val, JavaThread* thread))
@@ -85,11 +81,7 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1(oopDesc* n
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load c1");
   G1CollectedHeap* heap = G1CollectedHeap::heap();
-  if(heap->is_in_young(new_val)){
-    heap->policy()->inc_young_load_count();
-  } else {
-    heap->policy()->inc_old_load_count();
-  }
+  heap->policy()->record_load(new_val);
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread))
@@ -98,9 +90,5 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* n
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load c2 %lu", G1ThreadLocalData::data(thread)->_load_count);
   G1CollectedHeap* heap = G1CollectedHeap::heap();
-  if(heap->is_in_young(new_val)){
-    heap->policy()->inc_young_load_count();
-  } else {
-    heap->policy()->inc_old_load_count();
-  }
+  heap->policy()->record_load(new_val);
 JRT_END

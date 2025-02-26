@@ -234,7 +234,8 @@ HeapRegion::HeapRegion(uint hrm_index,
   _young_index_in_cset(-1),
   _surv_rate_group(nullptr),
   _age_index(G1SurvRateGroup::InvalidAgeIndex),
-  _node_index(G1NUMA::UnknownNodeIndex)
+  _node_index(G1NUMA::UnknownNodeIndex),
+  _block_visit(nullptr),
 {
   assert(Universe::on_page_boundary(mr.start()) && Universe::on_page_boundary(mr.end()),
          "invalid space boundaries");
@@ -253,6 +254,7 @@ void HeapRegion::initialize(bool clear_space, bool mangle_space) {
   set_top(bottom());
 
   hr_clear(false /*clear_space*/);
+  _block_visit = NEW_C_HEAP_ARRAY(size_t, 1 << 6, mtGC);
 }
 
 void HeapRegion::report_region_type_change(G1HeapRegionTraceType::Type to) {

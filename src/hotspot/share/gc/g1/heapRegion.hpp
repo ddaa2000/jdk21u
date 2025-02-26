@@ -84,6 +84,8 @@ class HeapRegion : public CHeapObj<mtGC> {
   // into the region was and this is what this keeps track.
   HeapWord* _pre_dummy_top;
 
+  size_t* _block_visit;
+
 public:
   HeapWord* bottom() const         { return _bottom; }
   HeapWord* end() const            { return _end;    }
@@ -118,6 +120,8 @@ public:
   size_t free() const { return byte_size(top(), end()); }
 
   bool is_empty() const { return used() == 0; }
+
+  size_t* block_visit() { return _block_visit; }
 
 private:
 
@@ -282,6 +286,10 @@ public:
              G1BlockOffsetTable* bot,
              MemRegion mr,
              G1CardSetConfiguration* config);
+  
+  ~HeapRegion(){
+    delete[] _block_visit;
+  }
 
   // If this region is a member of a HeapRegionManager, the index in that
   // sequence, otherwise -1.
