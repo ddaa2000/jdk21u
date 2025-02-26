@@ -26,6 +26,9 @@
 #include "gc/g1/g1BarrierSet.inline.hpp"
 #include "gc/g1/g1BarrierSetRuntime.hpp"
 #include "gc/g1/g1ThreadLocalData.hpp"
+#include "gc/g1/g1Policy.hpp"
+#include "gc/g1/g1CollectedHeap.hpp"
+#include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "utilities/macros.hpp"
 
@@ -69,12 +72,24 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_asm(oopDesc* 
   assert(new_val != nullptr, "should be optimized out");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load asm");
+  G1CollectedHeap* heap = G1CollectedHeap::heap();
+  if(heap->is_in_young(new_val)){
+    heap->policy()->inc_young_load_count();
+  } else {
+    heap->policy()->inc_old_load_count();
+  }
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c1(oopDesc* new_val, JavaThread* thread))
   assert(thread == JavaThread::current(), "pre-condition");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load c1");
+  G1CollectedHeap* heap = G1CollectedHeap::heap();
+  if(heap->is_in_young(new_val)){
+    heap->policy()->inc_young_load_count();
+  } else {
+    heap->policy()->inc_old_load_count();
+  }
 JRT_END
 
 JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread))
@@ -82,4 +97,10 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* n
   assert(new_val != nullptr, "should be optimized out");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
   // log_info(gc)("load c2 %lu", G1ThreadLocalData::data(thread)->_load_count);
+  G1CollectedHeap* heap = G1CollectedHeap::heap();
+  if(heap->is_in_young(new_val)){
+    heap->policy()->inc_young_load_count();
+  } else {
+    heap->policy()->inc_old_load_count();
+  }
 JRT_END

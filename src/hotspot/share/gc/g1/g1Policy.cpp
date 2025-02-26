@@ -64,6 +64,8 @@ G1Policy::G1Policy(STWGCTimer* gc_timer) :
   _young_list_desired_length(0),
   _young_list_target_length(0),
   _young_list_max_length(0),
+  _young_load_count(0),
+  _old_load_count(0),
   _eden_surv_rate_group(new G1SurvRateGroup()),
   _survivor_surv_rate_group(new G1SurvRateGroup()),
   _reserve_factor((double) G1ReservePercent / 100.0),

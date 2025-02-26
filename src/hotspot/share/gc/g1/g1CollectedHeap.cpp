@@ -2722,6 +2722,9 @@ void G1CollectedHeap::do_collection_pause_at_safepoint_helper() {
   G1YoungCollector collector(gc_cause());
   collector.collect();
   gc_majflt_stats.end_and_log("young");
+  log_info(gc)("load young %lu, load old %lu", policy()->get_young_load_count(), policy()->get_old_load_count());
+  policy()->reset_load_count();
+
 
   // It should now be safe to tell the concurrent mark thread to start
   // without its logging output interfering with the logging output

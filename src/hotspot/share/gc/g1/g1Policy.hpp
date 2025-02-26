@@ -89,6 +89,13 @@ class G1Policy: public CHeapObj<mtGC> {
   // locker is active. This should be >= _young_list_target_length;
   volatile uint _young_list_max_length;
 
+  volatile size_t _young_load_count;
+  volatile size_t _old_load_count;
+  volatile size_t _total_load_count;
+
+  size_t _young_load_count_array[1000];
+
+
   // The survivor rate groups below must be initialized after the predictor because they
   // indirectly use it through the "this" object passed to their constructor.
   G1SurvRateGroup* _eden_surv_rate_group;
@@ -180,6 +187,46 @@ public:
   double max_pause_time_ms() const {
     return _mmu_tracker->max_gc_time() * 1000.0;
   }
+
+inline void inc_young_load_count(){
+    Atomic::inc(&_young_load_count);
+    size_t present_total_load_count;
+    while(true){
+      present_total_load_count = _total_load_count;
+      size_t old_val =  Atomic::cmpxchg(&_total_load_count, present_total_load_count, present_total_load_count + 1);
+      if( old_val == present_total_load_count){
+        break;
+      }
+    }
+    size_t new_val = present_total_load_count + 1;
+}
+
+inline void inc_old_load_count(){
+    Atomic::inc(&_old_load_count);
+    size_t present_total_load_count;
+    while(true){
+      present_total_load_count = _total_load_count;
+      size_t old_val =  Atomic::cmpxchg(&_total_load_count, present_total_load_count, present_total_load_count + 1);
+      if( old_val == present_total_load_count){
+        break;
+      }
+    }
+    size_t new_val = present_total_load_count + 1;
+}
+
+inline void reset_load_count(){
+  _young_load_count = 0;
+  _old_load_count = 0;
+  _total_load_count = 0;
+}
+
+inline size_t get_young_load_count(){
+  return _young_load_count;
+}
+
+inline size_t get_old_load_count(){
+  return _old_load_count;
+}
 
 private:
   G1CollectionSet* _collection_set;
