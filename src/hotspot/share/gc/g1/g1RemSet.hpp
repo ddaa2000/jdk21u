@@ -34,6 +34,7 @@
 #include "memory/iterator.hpp"
 #include "utilities/ticks.hpp"
 #include <atomic>
+#include <random>
 
 // A G1RemSet provides ways of iterating over pointers into a selected
 // collection set.
@@ -136,6 +137,10 @@ public:
 
   // Print accumulated summary info from the last time called.
   void print_periodic_summary_info(const char* header, uint period_count, bool show_thread_times);
+
+  void shuffle_next_dirty_regions();
+
+  void print_next_dirty_regions() const;
 };
 
 #endif // SHARE_GC_G1_G1REMSET_HPP

@@ -22,6 +22,7 @@
  *
  */
 
+#include "logging/log.hpp"
 #include "precompiled.hpp"
 
 #include "classfile/classLoaderDataGraph.inline.hpp"
@@ -697,6 +698,12 @@ void G1YoungCollector::evacuate_initial_collection_set(G1ParScanThreadStateSet* 
   Tickspan task_time;
   const uint num_workers = workers()->active_workers();
 
+  log_info(gc) ("before shuffle_next_dirty_regions");
+  _g1h->rem_set()->print_next_dirty_regions();
+  _g1h->rem_set()->shuffle_next_dirty_regions();
+  log_info(gc) ("after shuffle_next_dirty_regions");
+  _g1h->rem_set()->print_next_dirty_regions();
+
   Ticks start_processing = Ticks::now();
   {
     G1RootProcessor root_processor(_g1h, num_workers);
@@ -782,6 +789,12 @@ void G1YoungCollector::evacuate_optional_collection_set(G1ParScanThreadStateSet*
     }
 
     {
+      log_info(gc) ("before shuffle_next_dirty_regions");
+      _g1h->rem_set()->print_next_dirty_regions();
+      _g1h->rem_set()->shuffle_next_dirty_regions();
+      log_info(gc) ("after shuffle_next_dirty_regions");
+      _g1h->rem_set()->print_next_dirty_regions();
+      
       Ticks start = Ticks::now();
       evacuate_next_optional_regions(per_thread_states);
       phase_times()->record_or_add_optional_evac_time((Ticks::now() - start).seconds() * 1000.0);

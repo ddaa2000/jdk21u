@@ -194,6 +194,32 @@ private:
         }
       }
     }
+
+    void shuffle() {
+      if (_cur_idx <= 1) {
+        return;
+      }
+
+      uint32_t seed = static_cast<uint32_t>(os::elapsed_counter());
+
+      for (uint i = _cur_idx - 1; i > 0; --i) {
+        seed = (seed * 214013 + 2531011);
+        uint j = (seed >> 16) % (i + 1);
+  
+        uint temp = _buffer[i];
+        _buffer[i] = _buffer[j];
+        _buffer[j] = temp;
+      }
+    }
+
+    void print() const {
+      if (_cur_idx == 0) {
+        log_info(gc) ("the size of next_dirty_region is 0");
+      }
+      for (uint i = 0; i < _cur_idx; i++) {
+        log_info(gc) ("region_idx: %u", _buffer[i]);
+      }
+    }
   };
 
   // For each region, contains the maximum top() value to be used during this garbage
@@ -345,6 +371,14 @@ public:
     return _next_dirty_regions->size() * HeapRegion::CardsPerRegion;
   }
 
+  void shuffle_next_dirty_regions() {
+    _next_dirty_regions->shuffle();
+  }
+
+  void print_next_dirty_regions() const {
+    _next_dirty_regions->print();
+  }
+
   void set_chunk_range_dirty(size_t const region_card_idx, size_t const card_length) {
     size_t chunk_idx = region_card_idx >> _scan_chunks_shift;
     // Make sure that all chunks that contain the range are marked. Calculate the
@@ -377,6 +411,7 @@ public:
 
   void iterate_dirty_regions_from(HeapRegionClosure* cl, uint worker_id) {
     uint num_regions = _next_dirty_regions->size();
+    // log_info(gc) ("num_regions: %u", num_regions);
 
     if (num_regions == 0) {
       return;
@@ -1664,4 +1699,12 @@ void G1RemSet::print_summary_info() {
     LogStream ls(log.trace());
     current.print_on(&ls, true /* show_thread_times*/);
   }
+}
+
+void G1RemSet::shuffle_next_dirty_regions() {
+  _scan_state->shuffle_next_dirty_regions();
+}
+
+void G1RemSet::print_next_dirty_regions() const {
+  _scan_state->print_next_dirty_regions();
 }
