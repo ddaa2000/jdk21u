@@ -250,7 +250,13 @@ private:
 
 public:
   size_t bytes_used_during_gc() const { return _bytes_used_during_gc; }
-
+  // the number of regions scanned during gc
+  std::atomic<unsigned long> scan_regions;
+  // the number of cards scanned during gc
+  std::atomic<unsigned long> scan_cards;
+  // used time
+  std::atomic<uint64_t> scan_time;
+  std::atomic<uint64_t> scan_time_user;
 private:
   // GC allocation statistics policy for survivors.
   G1EvacStats _survivor_evac_stats;

@@ -22,6 +22,7 @@
  *
  */
 
+#include "logging/log.hpp"
 #include "precompiled.hpp"
 #include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1BatchedTask.hpp"
@@ -523,8 +524,14 @@ class G1ScanHRForRegionClosure : public HeapRegionClosure {
   size_t _chunks_claimed;
   size_t _heap_roots_found;
 
+public:
+  Tickspan _prev_rem_set_root_scan_time;
   Tickspan _rem_set_root_scan_time;
   Tickspan _rem_set_trim_partially_time;
+
+  size_t _rem_set_root_scan_user_time;
+  size_t _rem_set_trim_partially_user_time;
+
 
   // The address to which this thread already scanned (walked the heap) up to during
   // card scanning (exclusive).
@@ -559,8 +566,20 @@ class G1ScanHRForRegionClosure : public HeapRegionClosure {
       return;
     }
     MemRegion mr(MAX2(card_start, _scanned_to), scan_end);
+    // const size_t start_user = os::get_cur_thread_usertime();
+    // auto stt = Ticks::now();
     _scanned_to = scan_memregion(region_idx, mr);
+    // auto used_time = Ticks::now() - stt - _pss->trim_ticks();
+    // auto used_time_user = os::get_cur_thread_usertime() - start_user - _pss->trim_ticks_user();
 
+    this->_g1h->scan_cards += num_cards;
+    // this->_g1h->scan_regions += 1;
+    // atomic_add(this->_g1h->scan_time, used_time.microseconds() * 1.0);
+    // atomic_add(this->_g1h->scan_time_user, used_time_user * 1.0);
+
+    // if (this->_g1h->scan_regions.load() % 10 == 0) {
+    //   log_info(gc) ("[%u] scanned_regions: %lu, scanned_cards: %lu, cost_card_scan_user: %lf, cost_per_card_scan_user: %lf; cost_card_scan: %lf, cost_per_card_scan: %lf", _worker_id, this->_g1h->scan_regions.load(), this->_g1h->scan_cards.load(), this->_g1h->scan_time_user.load(), this->_g1h->scan_time_user.load() / this->_g1h->scan_cards.load(), this->_g1h->scan_time.load(), this->_g1h->scan_time.load() / this->_g1h->scan_cards.load());
+    // }
     _cards_scanned += num_cards;
   }
 
@@ -706,8 +725,11 @@ public:
     _blocks_scanned(0),
     _chunks_claimed(0),
     _heap_roots_found(0),
+    _prev_rem_set_root_scan_time(),
     _rem_set_root_scan_time(),
     _rem_set_trim_partially_time(),
+    _rem_set_root_scan_user_time(0),
+    _rem_set_trim_partially_user_time(0),
     _scanned_to(nullptr),
     _scanned_card_value(remember_already_scanned_cards ? G1CardTable::g1_scanned_card_val()
                                                        : G1CardTable::clean_card_val()) {
@@ -722,51 +744,66 @@ public:
     // pay attention to _rem_set_trim_partially_time
     auto _prev_rem_set_trim_partially_time = _rem_set_trim_partially_time;
     if (_scan_state->has_cards_to_scan(region_idx)) {
-      G1EvacPhaseWithTrimTimeTracker timer(_pss, _rem_set_root_scan_time, _rem_set_trim_partially_time);
-      scan_heap_roots(r);
-    }
-    auto delta_trim_time = _rem_set_trim_partially_time - _prev_rem_set_trim_partially_time;
-    _prev_rem_set_trim_partially_time = _rem_set_trim_partially_time;
+      {
+        G1EvacPhaseWithTrimTimeTracker timer(_pss, _rem_set_root_scan_time, _rem_set_trim_partially_time, _rem_set_root_scan_user_time, _rem_set_trim_partially_user_time);
+        scan_heap_roots(r);
+      }
+      
+      this->_g1h->scan_regions += 1;
+      auto delta_time = _rem_set_root_scan_time - _prev_rem_set_root_scan_time;
+      _prev_rem_set_root_scan_time = _rem_set_root_scan_time;
+      this->_g1h->scan_time += delta_time.microseconds();
 
-    // _g1h->_copy_time.fetch_add(delta_trim_time.microseconds());
-    _pss->_thread_local_copy_time += delta_trim_time.microseconds();
 
-    if (_pss->_thread_local_temp_bytes >= MERGE_THRESHOLD) {
-      auto prev_total_copy_time = _g1h->_copy_time.fetch_add(_pss->_thread_local_copy_time, std::memory_order_relaxed);
-      auto total_copy_time = prev_total_copy_time + _pss->_thread_local_copy_time;
-      _pss->_thread_local_copy_time = 0;
-
-      auto prev_total_copy_bytes = _g1h->_total_bytes.fetch_add(_pss->_thread_local_temp_bytes, std::memory_order_relaxed);
-      auto total_copy_bytes = prev_total_copy_bytes + _pss->_thread_local_temp_bytes;
-
-      uint64_t prev_temp = _g1h->_temp_total_bytes.fetch_add(_pss->_thread_local_temp_bytes, std::memory_order_relaxed);
-      uint64_t new_temp = prev_temp + _pss->_thread_local_temp_bytes;
-      _pss->_thread_local_temp_bytes = 0;
-
-      if (new_temp >= LOG_THRESHOLD) {
-          uint64_t current_temp = _g1h->_temp_total_bytes.load(std::memory_order_relaxed);
-          while (current_temp >= LOG_THRESHOLD) {
-              uint64_t reset_value = current_temp % LOG_THRESHOLD;
-              // Attempt to reset _temp_total_bytes using CAS
-              if (_g1h->_temp_total_bytes.compare_exchange_weak(current_temp, reset_value,   std::memory_order_relaxed))      {
-                  // auto total_copy_time = _g1h->_copy_time.load(std::memory_order_relaxed);
-                  // auto total_copy_bytes = _g1h->_total_bytes.load(std::memory_order_relaxed);
-                  log_info(gc)("[%u] total_copy_time: %luus, total_copy_bytes: %lu, cost_per_byte: %lfus",
-                               _worker_id,
-                               total_copy_time, total_copy_bytes,
-                               total_copy_time * 1.0 / total_copy_bytes / ParallelGCThreads);
-                  break;
-              }
-              // CAS failed, reload the current value and retry
-              current_temp = _g1h->_temp_total_bytes.load(std::memory_order_relaxed);
+      if (this->_g1h->scan_regions.load() % 1 == 0) {
+        log_info(gc) ("[%u] scanned_regions: %lu, scanned_cards: %lu, cost_card_scan: %lu, cost_per_card_scan: %lf", _worker_id, this->_g1h->scan_regions.load(), this->_g1h->scan_cards.load(), this->_g1h->scan_time.load(), this->_g1h->scan_time.load() * 1.0 / this->_g1h->scan_cards.load());
+      }
+      auto delta_trim_time = _rem_set_trim_partially_time - _prev_rem_set_trim_partially_time;
+      _prev_rem_set_trim_partially_time = _rem_set_trim_partially_time;
+  
+      // _g1h->_copy_time.fetch_add(delta_trim_time.microseconds());
+      _pss->_thread_local_copy_time += delta_trim_time.microseconds();
+  
+      if (_pss->_thread_local_temp_bytes >= MERGE_THRESHOLD) {
+        auto prev_total_copy_time = _g1h->_copy_time.fetch_add(_pss->_thread_local_copy_time, std::memory_order_relaxed);
+        auto total_copy_time = prev_total_copy_time + _pss->_thread_local_copy_time;
+        _pss->_thread_local_copy_time = 0;
+  
+        auto prev_total_copy_bytes = _g1h->_total_bytes.fetch_add(_pss->_thread_local_temp_bytes, std::memory_order_relaxed);
+        auto total_copy_bytes = prev_total_copy_bytes + _pss->_thread_local_temp_bytes;
+  
+        uint64_t prev_temp = _g1h->_temp_total_bytes.fetch_add(_pss->_thread_local_temp_bytes, std::memory_order_relaxed);
+        uint64_t new_temp = prev_temp + _pss->_thread_local_temp_bytes;
+        _pss->_thread_local_temp_bytes = 0;
+  
+        if (new_temp >= LOG_THRESHOLD) {
+            uint64_t current_temp = _g1h->_temp_total_bytes.load(std::memory_order_relaxed);
+            while (current_temp >= LOG_THRESHOLD) {
+                uint64_t reset_value = current_temp % LOG_THRESHOLD;
+                // Attempt to reset _temp_total_bytes using CAS
+                if (_g1h->_temp_total_bytes.compare_exchange_weak(current_temp, reset_value,   std::memory_order_relaxed))      {
+                    // auto total_copy_time = _g1h->_copy_time.load(std::memory_order_relaxed);
+                    // auto total_copy_bytes = _g1h->_total_bytes.load(std::memory_order_relaxed);
+                    log_info(gc)("[%u] total_copy_time: %luus, total_copy_bytes: %lu, cost_per_byte: %lfus",
+                                 _worker_id,
+                                 total_copy_time, total_copy_bytes,
+                                 total_copy_time * 1.0 / total_copy_bytes / ParallelGCThreads);
+                    break;
+                }
+                // CAS failed, reload the current value and retry
+                current_temp = _g1h->_temp_total_bytes.load(std::memory_order_relaxed);
+        }
       }
     }
   }
-    return false;
-  }
+  return false;
+}
 
   Tickspan rem_set_root_scan_time() const { return _rem_set_root_scan_time; }
   Tickspan rem_set_trim_partially_time() const { return _rem_set_trim_partially_time; }
+
+  size_t rem_set_root_scan_user_time() const { return _rem_set_root_scan_user_time; }
+  size_t rem_set_trim_partially_user_time() const { return _rem_set_trim_partially_user_time; }
 
   size_t cards_scanned() const { return _cards_scanned; }
   size_t blocks_scanned() const { return _blocks_scanned; }
@@ -788,8 +825,10 @@ void G1RemSet::scan_heap_roots(G1ParScanThreadState* pss,
   G1GCPhaseTimes* p = _g1p->phase_times();
 
   p->record_or_add_time_secs(objcopy_phase, worker_id, cl.rem_set_trim_partially_time().seconds());
-  // _g1h->_copy_time.fetch_add(cl.rem_set_trim_partially_time().microseconds());
+
   p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_root_scan_time().seconds());
+  // log_info(gc) ("rem_set_root_scan_user_time: %lf", cl.rem_set_root_scan_user_time() * 1.0);
+  p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_root_scan_user_time(), G1GCPhaseTimes::ScanHRUserTime);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.cards_scanned(), G1GCPhaseTimes::ScanHRScannedCards);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.blocks_scanned(), G1GCPhaseTimes::ScanHRScannedBlocks);
   p->record_or_add_thread_work_item(scan_phase, worker_id, cl.chunks_claimed(), G1GCPhaseTimes::ScanHRClaimedChunks);
@@ -814,8 +853,14 @@ class G1ScanCollectionSetRegionClosure : public HeapRegionClosure {
   Tickspan _code_root_scan_time;
   Tickspan _code_trim_partially_time;
 
+  size_t _code_root_scan_user_time;
+  size_t _code_trim_partially_user_time;
+
   Tickspan _rem_set_opt_root_scan_time;
   Tickspan _rem_set_opt_trim_partially_time;
+
+  size_t _rem_set_opt_root_scan_user_time;
+  size_t _rem_set_opt_trim_partially_user_time;
 
   void scan_opt_rem_set_roots(HeapRegion* r) {
     G1OopStarChunkedList* opt_rem_set_list = _pss->oops_into_optional_region(r);
@@ -842,8 +887,12 @@ public:
     _opt_refs_memory_used(0),
     _code_root_scan_time(),
     _code_trim_partially_time(),
+    _code_root_scan_user_time(0),
+    _code_trim_partially_user_time(0),
     _rem_set_opt_root_scan_time(),
-    _rem_set_opt_trim_partially_time() { }
+    _rem_set_opt_trim_partially_time(),
+    _rem_set_opt_root_scan_user_time(0),
+    _rem_set_opt_trim_partially_user_time(0) { }
 
   bool do_heap_region(HeapRegion* r) {
     uint const region_idx = r->hrm_index();
@@ -852,7 +901,7 @@ public:
     // always need to scan them.
     if (r->has_index_in_opt_cset()) {
       EventGCPhaseParallel event;
-      G1EvacPhaseWithTrimTimeTracker timer(_pss, _rem_set_opt_root_scan_time, _rem_set_opt_trim_partially_time);
+      G1EvacPhaseWithTrimTimeTracker timer(_pss, _rem_set_opt_root_scan_time, _rem_set_opt_trim_partially_time, _rem_set_opt_root_scan_user_time, _rem_set_opt_trim_partially_user_time);
       scan_opt_rem_set_roots(r);
 
       event.commit(GCId::current(), _worker_id, G1GCPhaseTimes::phase_name(_scan_phase));
@@ -862,7 +911,7 @@ public:
     if (_scan_state->claim_collection_set_region(region_idx)) {
       // pay attention to _code_trim_partially_time
       EventGCPhaseParallel event;
-      G1EvacPhaseWithTrimTimeTracker timer(_pss, _code_root_scan_time, _code_trim_partially_time);
+      G1EvacPhaseWithTrimTimeTracker timer(_pss, _code_root_scan_time, _code_trim_partially_time, _code_root_scan_user_time, _code_trim_partially_user_time);
       // Scan the code root list attached to the current region
       r->code_roots_do(_pss->closures()->weak_codeblobs());
 
@@ -913,8 +962,14 @@ public:
   Tickspan code_root_scan_time() const { return _code_root_scan_time;  }
   Tickspan code_root_trim_partially_time() const { return _code_trim_partially_time; }
 
+  size_t code_root_scan_user_time() const { return _code_root_scan_user_time;  }
+  size_t code_root_trim_partially_user_time() const { return _code_trim_partially_user_time; }
+
   Tickspan rem_set_opt_root_scan_time() const { return _rem_set_opt_root_scan_time; }
   Tickspan rem_set_opt_trim_partially_time() const { return _rem_set_opt_trim_partially_time; }
+
+  size_t rem_set_opt_root_scan_user_time() const { return _rem_set_opt_root_scan_user_time; }
+  size_t rem_set_opt_trim_partially_user_time() const { return _rem_set_opt_trim_partially_user_time; }
 
   size_t opt_roots_scanned() const { return _opt_roots_scanned; }
   size_t opt_refs_scanned() const { return _opt_refs_scanned; }
@@ -931,11 +986,18 @@ void G1RemSet::scan_collection_set_regions(G1ParScanThreadState* pss,
 
   G1GCPhaseTimes* p = _g1h->phase_times();
 
-  p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_root_scan_time().seconds());
-  p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_trim_partially_time().seconds());
+  // [yyz:debug]
+  // p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_root_scan_time().seconds());
+  // p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_opt_trim_partially_time().seconds());
+  
+  // p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_root_scan_user_time(), G1GCPhaseTimes::ScanHRUserTime);
+  // p->record_or_add_thread_work_item(scan_phase, worker_id, cl.rem_set_opt_trim_partially_user_time(), G1GCPhaseTimes::ScanHRUserTime);
+
 
   p->record_or_add_time_secs(coderoots_phase, worker_id, cl.code_root_scan_time().seconds());
   p->add_time_secs(objcopy_phase, worker_id, cl.code_root_trim_partially_time().seconds());
+
+  p->record_or_add_thread_work_item(objcopy_phase, worker_id, cl.code_root_trim_partially_user_time(), G1GCPhaseTimes::UserTime);
   // _g1h->_copy_time.fetch_add(cl.code_root_trim_partially_time().microseconds());
   // At this time we record some metrics only for the evacuations after the initial one.
   if (scan_phase == G1GCPhaseTimes::OptScanHR) {

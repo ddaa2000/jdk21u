@@ -78,6 +78,8 @@ public:
   uint const _stack_trim_lower_threshold;
 
   Tickspan _trim_ticks;
+  size_t _trim_ticks_user;
+
   // Map from young-age-index (0 == not young, 1 is youngest) to
   // surviving words. base is what we get back from the malloc call
   size_t* _surviving_young_words_base;
@@ -222,6 +224,8 @@ public:
   void steal_and_trim_queue(G1ScannerTasksQueueSet *task_queues);
 
   Tickspan trim_ticks() const;
+  long trim_ticks_user() const;
+
   void reset_trim_ticks();
 
   // An attempt to evacuate "obj" has failed; take necessary steps.

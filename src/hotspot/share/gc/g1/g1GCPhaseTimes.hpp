@@ -127,7 +127,12 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
     ScanHRClaimedChunks,
     ScanHRFoundRoots,
     ScanHRScannedOptRefs,
-    ScanHRUsedMemory
+    ScanHRUsedMemory,
+    ScanHRUserTime,
+  };
+
+  enum GCCPUTimeItems {
+    UserTime
   };
 
   enum GCMergeLBWorkItems {
@@ -269,6 +274,8 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
 
   size_t sum_thread_work_items(GCParPhases phase, uint index = 0);
 
+  size_t avg_thread_work_items(GCParPhases phase, uint index);
+
   void record_pre_evacuate_prepare_time_ms(double ms) {
     _cur_pre_evacuate_prepare_time_ms = ms;
   }
@@ -408,13 +415,17 @@ class G1GCPhaseTimes : public CHeapObj<mtGC> {
 class G1EvacPhaseWithTrimTimeTracker : public StackObj {
   G1ParScanThreadState* _pss;
   Ticks _start;
+  size_t _start_user;
 
   Tickspan& _total_time;
   Tickspan& _trim_time;
 
+  size_t& _total_time_user;
+  size_t& _trim_time_user;
+
   bool _stopped;
 public:
-  G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time);
+  G1EvacPhaseWithTrimTimeTracker(G1ParScanThreadState* pss, Tickspan& total_time, Tickspan& trim_time, size_t& total_time_user, size_t& trim_time_user);
   ~G1EvacPhaseWithTrimTimeTracker();
 
   void stop();

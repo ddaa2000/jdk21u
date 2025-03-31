@@ -46,6 +46,9 @@ public:
 class G1EvacPhaseTimesTracker : public G1GCParPhaseTimesTracker {
   Tickspan _total_time;
   Tickspan _trim_time;
+  
+  size_t _total_time_user;
+  size_t _trim_time_user;
 
   G1ParScanThreadState* _pss;
   G1EvacPhaseWithTrimTimeTracker _trim_tracker;
