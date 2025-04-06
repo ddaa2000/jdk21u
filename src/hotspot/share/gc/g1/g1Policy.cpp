@@ -859,10 +859,11 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
 
       size_t total_user_time_card_scan = p->avg_thread_work_items(G1GCPhaseTimes::ScanHR, G1GCPhaseTimes::ScanHRUserTime) +
                                         p->avg_thread_work_items(G1GCPhaseTimes::OptScanHR, G1GCPhaseTimes::ScanHRUserTime);
+
       log_info(gc)("total_cards_scanned: %lu", total_cards_scanned);
-      // log_info(gc)("user_time_dirty_card_scan: %lf", total_user_time_card_scan * 1.0);
+      log_info(gc)("user_time_dirty_card_scan: %lf", total_user_time_card_scan * 1.0);
       log_info(gc)("sum_time_dirty_card_scan: %lf", sum_time_dirty_card_scan * 1000.0);
-      // log_info(gc)("cost_per_card_scan_user: %lf", total_user_time_card_scan * 1.0 / total_cards_scanned);
+      log_info(gc)("cost_per_card_scan_user: %lf", total_user_time_card_scan * 1.0 / total_cards_scanned);
       log_info(gc)("cost_per_card_scan: %lf", sum_time_dirty_card_scan * 1000.0 / total_cards_scanned);
 
     // } else {
@@ -889,8 +890,8 @@ void G1Policy::record_young_collection_end(bool concurrent_operation_is_full_mar
     if (copied_bytes > 0) {
       double cost_per_byte_ms = (average_time_ms(G1GCPhaseTimes::ObjCopy) + average_time_ms(G1GCPhaseTimes::OptObjCopy)) / copied_bytes;
 
-      log_info(gc)("[profile: _g1h->_copy_time]: %luus", _g1h->_copy_time.load(std::memory_order_relaxed));
-      log_info(gc)("[profile: sum_copy_time]: %lfus", (sum_time_ms(G1GCPhaseTimes::ObjCopy) + sum_time_ms(G1GCPhaseTimes::OptObjCopy)) * 1000.0);
+      // log_info(gc)("[profile: _g1h->_copy_time]: %luus", _g1h->_copy_time.load(std::memory_order_relaxed));
+      // log_info(gc)("[profile: sum_copy_time]: %lfus", (sum_time_ms(G1GCPhaseTimes::ObjCopy) + sum_time_ms(G1GCPhaseTimes::OptObjCopy)) * 1000.0);
       log_info(gc)("[profile: cost_per_byte_ms] predict: %lf, real: %lf", _analytics->predict_zero_bounded(&_analytics->_cost_per_byte_copied_ms_seq, is_young_only_pause) * 1000.0, cost_per_byte_ms * 1000.0);
 
       _analytics->report_cost_per_byte_ms(cost_per_byte_ms, is_young_only_pause);
