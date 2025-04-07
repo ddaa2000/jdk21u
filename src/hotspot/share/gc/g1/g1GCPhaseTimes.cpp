@@ -639,7 +639,7 @@ void G1EvacPhaseWithTrimTimeTracker::stop() {
   _trim_time += _pss->trim_ticks();
   // [yyz:debug]
   _trim_time_user += _pss->trim_ticks_user();
-  log_info(gc) ("[yyz] (%u) trim time user: %lu", _pss->worker_id(), _trim_time_user);
+  // log_info(gc) ("[yyz] (%u) trim time user: %lu", _pss->worker_id(), _trim_time_user);
   _pss->reset_trim_ticks();
   _stopped = true;
 }
@@ -684,7 +684,7 @@ G1EvacPhaseTimesTracker::~G1EvacPhaseTimesTracker() {
     _phase_times->record_or_add_time_secs(G1GCPhaseTimes::ObjCopy, _worker_id, _trim_time.seconds());
     _phase_times->record_or_add_thread_work_item(G1GCPhaseTimes::ObjCopy, _worker_id, _trim_time_user, G1GCPhaseTimes::UserTime);
 
-    log_info(gc) ("[debug] (%u) _trim_time_user: %lu", _pss->worker_id(), _trim_time_user);
+    // log_info(gc) ("[debug] (%u) _trim_time_user: %lu", _pss->worker_id(), _trim_time_user);
 
     _pss->_thread_local_copy_time += _trim_time.microseconds();
 
