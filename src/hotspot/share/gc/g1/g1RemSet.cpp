@@ -825,6 +825,7 @@ void G1RemSet::scan_heap_roots(G1ParScanThreadState* pss,
   G1GCPhaseTimes* p = _g1p->phase_times();
 
   p->record_or_add_time_secs(objcopy_phase, worker_id, cl.rem_set_trim_partially_time().seconds());
+  
 
   p->record_or_add_time_secs(scan_phase, worker_id, cl.rem_set_root_scan_time().seconds());
   // log_info(gc) ("rem_set_root_scan_user_time: %lf", cl.rem_set_root_scan_user_time() * 1.0);
@@ -998,6 +999,7 @@ void G1RemSet::scan_collection_set_regions(G1ParScanThreadState* pss,
   p->add_time_secs(objcopy_phase, worker_id, cl.code_root_trim_partially_time().seconds());
 
   p->record_or_add_thread_work_item(objcopy_phase, worker_id, cl.code_root_trim_partially_user_time(), G1GCPhaseTimes::UserTime);
+  log_info(gc) ("[debug] (%u) code_root_trim_partially_user_time: %lu", pss->worker_id(), cl.code_root_trim_partially_user_time());
   // _g1h->_copy_time.fetch_add(cl.code_root_trim_partially_time().microseconds());
   // At this time we record some metrics only for the evacuations after the initial one.
   if (scan_phase == G1GCPhaseTimes::OptScanHR) {
