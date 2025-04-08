@@ -223,7 +223,7 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
     uintptr_t obj_addr = cast_from_oop<uintptr_t>(obj);
     uintptr_t prev_addr = _cm->_prev_obj_addr[_worker_id];
 
-    uintptr_t start = _g1h->reserved().start();
+    uintptr_t start = (uintptr_t)_g1h->reserved().start();
     uintptr_t mem_region_cur = (obj_addr - start) >> 12;
     uintptr_t mem_region_prev = (prev_addr - start) >> 12;
 

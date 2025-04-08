@@ -474,8 +474,8 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
       uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
       _mem_region_retouch_counts[i] = NEW_C_HEAP_ARRAY(size_t*, bin_size_mem_region, mtGC);
 
-      MemRegion* reserved = _g1h->reserved();
-      size_t heap_size = reserved->byte_size();
+      MemRegion reserved = _g1h->reserved();
+      size_t heap_size = reserved.byte_size();
       size_t page_count = heap_size / (4 * K);
 
       for (uint j = 0; j < bin_size_mem_region; ++j) {
@@ -1110,8 +1110,8 @@ void G1ConcurrentMark::mark_from_roots() {
   for (uint i = 0; i < _max_concurrent_workers; ++i) {
     uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
 
-    MemRegion* reserved = _g1h->reserved();
-    size_t heap_size = reserved->byte_size();
+    MemRegion reserved = _g1h->reserved();
+    size_t heap_size = reserved.byte_size();
     size_t page_count = heap_size / (4 * K);
 
     for (uint j = 0; j < bin_size_mem_region; ++j) {
@@ -1134,8 +1134,8 @@ void G1ConcurrentMark::mark_from_roots() {
   }
 
   uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
-  MemRegion* reserved = _g1h->reserved();
-  size_t heap_size = reserved->byte_size();
+  MemRegion reserved = _g1h->reserved();
+  size_t heap_size = reserved.byte_size();
   size_t page_count = heap_size / (4 * K);
 
   for (uint j = 0; j < bin_size_mem_region; ++j) {
@@ -1177,7 +1177,7 @@ void G1ConcurrentMark::mark_from_roots() {
       }
     }
     log_info(gc)("mem region retouch count %u pages: %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu",
-      1UL << j, revisit_1, revisit_2, revisit_4, revisit_8,
+      1U << j, revisit_1, revisit_2, revisit_4, revisit_8,
       revisit_16, revisit_64, revisit_256,
       revisit_1024, revisit_4096,
       revisit_above_4096);
