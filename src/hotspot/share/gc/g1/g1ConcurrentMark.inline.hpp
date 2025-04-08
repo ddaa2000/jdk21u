@@ -222,6 +222,19 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
   if (_cm->concurrent()) {
     uintptr_t obj_addr = cast_from_oop<uintptr_t>(obj);
     uintptr_t prev_addr = _cm->_prev_obj_addr[_worker_id];
+
+    uintptr_t start = _g1h->reserved().start();
+    uintptr_t mem_region_cur = (obj_addr - start) >> 12;
+    uintptr_t mem_region_prev = (prev_addr - start) >> 12;
+
+    for(int i = 0; i < SIZE_OF_MARK_MEM_REGION_BIN; ++i) {
+      if(mem_region_cur != mem_region_prev) {
+        _cm->_mem_region_retouch_counts[_worker_id][i][mem_region_cur] += 1;
+      }
+      mem_region_cur >>= 1;
+      mem_region_prev >>= 1;
+    }
+
     // Page size is 4KB
     uintptr_t dist_in_page = (obj_addr >= prev_addr) ?
       ((obj_addr >> 12) - (prev_addr >> 12)) :

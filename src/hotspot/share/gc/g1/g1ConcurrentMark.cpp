@@ -456,6 +456,9 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
   _mark_distance_cacheline = NEW_C_HEAP_ARRAY(uintptr_t*, _max_concurrent_workers, mtGC);
   _mark_wss_4KB = NEW_C_HEAP_ARRAY(uint8_t*, _max_concurrent_workers, mtGC);
   _prev_obj_addr = NEW_C_HEAP_ARRAY(uintptr_t, _max_concurrent_workers, mtGC);
+
+  _mem_region_retouch_counts = NEW_C_HEAP_ARRAY(size_t**, _max_concurrent_workers, mtGC);
+
   for (uint i = 0; i < _max_concurrent_workers; ++i) {
       uint bin_size = SIZE_OF_MARK_DISTANCE_BIN;
       _mark_distance_page[i] = NEW_C_HEAP_ARRAY(uintptr_t, bin_size, mtGC);
@@ -467,6 +470,19 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
       }
       _prev_obj_addr[i] = 0;
       memset(_mark_wss_4KB[i], 0, sizeof(uint8_t) * LEN_OF_MARK_PAGE_ARRAY);
+
+      uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
+      _mem_region_retouch_counts[i] = NEW_C_HEAP_ARRAY(size_t*, bin_size_mem_region, mtGC);
+
+      MemRegion* reserved = _g1h->reserved();
+      size_t heap_size = reserved->byte_size();
+      size_t page_count = heap_size / (4 * K);
+
+      for (uint j = 0; j < bin_size_mem_region; ++j) {
+        size_t mem_region_count = (page_count >> j) + 1;
+        _mem_region_retouch_counts[i][j] = NEW_C_HEAP_ARRAY(size_t, mem_region_count, mtGC);
+        memset(_mem_region_retouch_counts[i][j], 0, sizeof(size_t) * mem_region_count);
+      }
   }
 
   reset_at_marking_complete();
@@ -580,11 +596,16 @@ G1ConcurrentMark::~G1ConcurrentMark() {
     FREE_C_HEAP_ARRAY(uintptr_t, _mark_distance_page[i]);
     FREE_C_HEAP_ARRAY(uintptr_t, _mark_distance_cacheline[i]);
     FREE_C_HEAP_ARRAY(uint8_t, _mark_wss_4KB[i]);
+    for (uint j = 0; j < SIZE_OF_MARK_MEM_REGION_BIN; ++j) {
+      FREE_C_HEAP_ARRAY(size_t, _mem_region_retouch_counts[i][j]);
+    }
+    FREE_C_HEAP_ARRAY(size_t*, _mem_region_retouch_counts[i]);
   }
   FREE_C_HEAP_ARRAY(uintptr_t*, _mark_distance_page);
   FREE_C_HEAP_ARRAY(uintptr_t*, _mark_distance_cacheline);
   FREE_C_HEAP_ARRAY(uintptr_t, _prev_obj_addr);
   FREE_C_HEAP_ARRAY(uint8_t*, _mark_wss_4KB);
+  FREE_C_HEAP_ARRAY(size_t**, _mem_region_retouch_counts);
 
   // The G1ConcurrentMark instance is never freed.
   ShouldNotReachHere();
@@ -1086,6 +1107,19 @@ void G1ConcurrentMark::mark_from_roots() {
     memset(_mark_wss_4KB[i], 0, sizeof(uint8_t) * LEN_OF_MARK_PAGE_ARRAY);
   }
 
+  for (uint i = 0; i < _max_concurrent_workers; ++i) {
+    uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
+
+    MemRegion* reserved = _g1h->reserved();
+    size_t heap_size = reserved->byte_size();
+    size_t page_count = heap_size / (4 * K);
+
+    for (uint j = 0; j < bin_size_mem_region; ++j) {
+      size_t mem_region_count = (page_count >> j) + 1;
+      memset(_mem_region_retouch_counts[i][j], 0, sizeof(size_t) * mem_region_count);
+    }
+  }
+
   G1CMConcurrentMarkingTask marking_task(this);
   _concurrent_workers->run_task(&marking_task);
 
@@ -1097,6 +1131,56 @@ void G1ConcurrentMark::mark_from_roots() {
       i, bin_pg[0], bin_pg[1], bin_pg[2], bin_pg[3], bin_pg[4], bin_pg[5], bin_pg[6], bin_pg[7], bin_pg[8], bin_pg[9], bin_pg[10]);
     log_info(gc, marking)("mark dist 64B worker %u: %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu",
       i, bin_cl[0], bin_cl[1], bin_cl[2], bin_cl[3], bin_cl[4], bin_cl[5], bin_cl[6], bin_cl[7], bin_cl[8], bin_cl[9], bin_cl[10]);
+  }
+
+  uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
+  MemRegion* reserved = _g1h->reserved();
+  size_t heap_size = reserved->byte_size();
+  size_t page_count = heap_size / (4 * K);
+
+  for (uint j = 0; j < bin_size_mem_region; ++j) {
+    size_t mem_region_count = (page_count >> j);
+    size_t revisit_1 = 0;
+    size_t revisit_2 = 0;
+    size_t revisit_4 = 0;
+    size_t revisit_8 = 0;
+    size_t revisit_16 = 0;
+    size_t revisit_64 = 0;
+    size_t revisit_256 = 0;
+    size_t revisit_1024 = 0;
+    size_t revisit_4096 = 0;
+    size_t revisit_above_4096 = 0;
+    for (uint i = 0; i < _max_concurrent_workers; ++i) {
+      for(uint k = 0; k < mem_region_count; ++k) {
+        size_t count = _mem_region_retouch_counts[i][j][k];
+        if (count == 1) {
+          revisit_1++;
+        } else if (count <= 2) {
+          revisit_2++;
+        } else if (count <= 4) {
+          revisit_4++;
+        } else if (count <= 8) {
+          revisit_8++;
+        } else if (count <= 16) {
+          revisit_16++;
+        } else if (count <= 64) {
+          revisit_64++;
+        } else if (count <= 256) {
+          revisit_256++;
+        } else if (count <= 1024) {
+          revisit_1024++;
+        } else if (count <= 4096) {
+          revisit_4096++;
+        } else {
+          revisit_above_4096++;
+        }
+      }
+    }
+    log_info(gc)("mem region retouch count %u pages: %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu",
+      1UL << j, revisit_1, revisit_2, revisit_4, revisit_8,
+      revisit_16, revisit_64, revisit_256,
+      revisit_1024, revisit_4096,
+      revisit_above_4096);
   }
 
   // Print distribution of touched pages

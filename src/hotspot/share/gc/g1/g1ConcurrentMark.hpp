@@ -279,6 +279,9 @@ public:
 // The bin has log2(address distance in page)
 //  e.g. 0, [2,4), [4,8), ..., [1024, 2048)
 #define SIZE_OF_MARK_DISTANCE_BIN 11
+// The bin has log4(address distance in page)
+#define SIZE_OF_MARK_MEM_REGION_BIN 5
+
 // For a 32gb heap, we have 8 * 1024 * 1024 4KB pages
 #define LEN_OF_MARK_PAGE_ARRAY (8 * 1024 * 1024)
 
@@ -375,6 +378,8 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   // Array of char to log number of marked obj addr in 4KB grain of a 32GB heap.
   // Each worker has a array with length of LEN_OF_MARK_PAGE_ARRAY
   uint8_t** _mark_wss_4KB;
+
+  size_t*** _mem_region_retouch_counts;
 
   enum class VerifyLocation {
     RemarkBefore,
