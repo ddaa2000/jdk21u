@@ -280,7 +280,7 @@ public:
 //  e.g. 0, [2,4), [4,8), ..., [1024, 2048)
 #define SIZE_OF_MARK_DISTANCE_BIN 11
 // The bin has log4(address distance in page)
-#define SIZE_OF_MARK_MEM_REGION_BIN 5
+#define SIZE_OF_MARK_MEM_REGION_BIN 11
 
 // For a 32gb heap, we have 8 * 1024 * 1024 4KB pages
 #define LEN_OF_MARK_PAGE_ARRAY (8 * 1024 * 1024)

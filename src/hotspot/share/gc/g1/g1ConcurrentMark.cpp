@@ -1150,10 +1150,16 @@ void G1ConcurrentMark::mark_from_roots() {
     size_t revisit_1024 = 0;
     size_t revisit_4096 = 0;
     size_t revisit_above_4096 = 0;
+
+    size_t visit_total = 0;
+    size_t revisit_total = 0;
+
     for (uint i = 0; i < _max_concurrent_workers; ++i) {
       for(uint k = 0; k < mem_region_count; ++k) {
         size_t count = _mem_region_retouch_counts[i][j][k];
-        if (count == 1) {
+        if (count == 0) {
+
+        } else if (count == 1) {
           revisit_1++;
         } else if (count <= 2) {
           revisit_2++;
