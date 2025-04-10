@@ -380,6 +380,11 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   uint8_t** _mark_wss_4KB;
 
   size_t*** _mem_region_retouch_counts;
+  size_t*** _mem_region_retouch_index;
+  size_t*** _mem_region_retouch_index_last;
+
+  size_t _present_index;
+
 
   enum class VerifyLocation {
     RemarkBefore,

@@ -459,6 +459,9 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
 
   _mem_region_retouch_counts = NEW_C_HEAP_ARRAY(size_t**, _max_concurrent_workers, mtGC);
 
+  _mem_region_retouch_index = NEW_C_HEAP_ARRAY(size_t**, _max_concurrent_workers, mtGC);
+  _mem_region_retouch_index_last = NEW_C_HEAP_ARRAY(size_t**, _max_concurrent_workers, mtGC);
+
   for (uint i = 0; i < _max_concurrent_workers; ++i) {
       uint bin_size = SIZE_OF_MARK_DISTANCE_BIN;
       _mark_distance_page[i] = NEW_C_HEAP_ARRAY(uintptr_t, bin_size, mtGC);
@@ -473,6 +476,8 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
 
       uint bin_size_mem_region = SIZE_OF_MARK_MEM_REGION_BIN;
       _mem_region_retouch_counts[i] = NEW_C_HEAP_ARRAY(size_t*, bin_size_mem_region, mtGC);
+      _mem_region_retouch_index[i] = NEW_C_HEAP_ARRAY(size_t*, bin_size_mem_region, mtGC);
+      _mem_region_retouch_index_last[i] = NEW_C_HEAP_ARRAY(size_t*, bin_size_mem_region, mtGC);
 
       MemRegion reserved = _g1h->reserved();
       size_t heap_size = reserved.byte_size();
@@ -481,7 +486,13 @@ G1ConcurrentMark::G1ConcurrentMark(G1CollectedHeap* g1h,
       for (uint j = 0; j < bin_size_mem_region; ++j) {
         size_t mem_region_count = (page_count >> j) + 1;
         _mem_region_retouch_counts[i][j] = NEW_C_HEAP_ARRAY(size_t, mem_region_count, mtGC);
+        _mem_region_retouch_index[i][j] = NEW_C_HEAP_ARRAY(size_t, mem_region_count, mtGC);
+        _mem_region_retouch_index_last[i][j] = NEW_C_HEAP_ARRAY(size_t, mem_region_count, mtGC);
+
         memset(_mem_region_retouch_counts[i][j], 0, sizeof(size_t) * mem_region_count);
+        memset(_mem_region_retouch_index[i][j], 0, sizeof(size_t) * mem_region_count);
+        memset(_mem_region_retouch_index_last[i][j], 0, sizeof(size_t) * mem_region_count);
+
       }
   }
 
@@ -598,14 +609,26 @@ G1ConcurrentMark::~G1ConcurrentMark() {
     FREE_C_HEAP_ARRAY(uint8_t, _mark_wss_4KB[i]);
     for (uint j = 0; j < SIZE_OF_MARK_MEM_REGION_BIN; ++j) {
       FREE_C_HEAP_ARRAY(size_t, _mem_region_retouch_counts[i][j]);
+      FREE_C_HEAP_ARRAY(size_t, _mem_region_retouch_index[i][j]);
+      FREE_C_HEAP_ARRAY(size_t, _mem_region_retouch_index_last[i][j]);
+
+
     }
     FREE_C_HEAP_ARRAY(size_t*, _mem_region_retouch_counts[i]);
+    FREE_C_HEAP_ARRAY(size_t*, _mem_region_retouch_index[i]);
+    FREE_C_HEAP_ARRAY(size_t*, _mem_region_retouch_index_last[i]);
+
+
   }
   FREE_C_HEAP_ARRAY(uintptr_t*, _mark_distance_page);
   FREE_C_HEAP_ARRAY(uintptr_t*, _mark_distance_cacheline);
   FREE_C_HEAP_ARRAY(uintptr_t, _prev_obj_addr);
   FREE_C_HEAP_ARRAY(uint8_t*, _mark_wss_4KB);
   FREE_C_HEAP_ARRAY(size_t**, _mem_region_retouch_counts);
+  FREE_C_HEAP_ARRAY(size_t**, _mem_region_retouch_index);
+  FREE_C_HEAP_ARRAY(size_t**, _mem_region_retouch_index_last);
+
+
 
   // The G1ConcurrentMark instance is never freed.
   ShouldNotReachHere();
@@ -1117,6 +1140,9 @@ void G1ConcurrentMark::mark_from_roots() {
     for (uint j = 0; j < bin_size_mem_region; ++j) {
       size_t mem_region_count = (page_count >> j) + 1;
       memset(_mem_region_retouch_counts[i][j], 0, sizeof(size_t) * mem_region_count);
+      memset(_mem_region_retouch_index[i][j], 0, sizeof(size_t) * mem_region_count);
+      memset(_mem_region_retouch_index_last[i][j], 0, sizeof(size_t) * mem_region_count);
+
     }
   }
 
@@ -1183,6 +1209,57 @@ void G1ConcurrentMark::mark_from_roots() {
       }
     }
     log_info(gc)("mem region retouch count %u pages: %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu",
+      1U << j, revisit_1, revisit_2, revisit_4, revisit_8,
+      revisit_16, revisit_64, revisit_256,
+      revisit_1024, revisit_4096,
+      revisit_above_4096);
+  }
+
+  for (uint j = 0; j < bin_size_mem_region; ++j) {
+    size_t mem_region_count = (page_count >> j);
+    size_t revisit_1 = 0;
+    size_t revisit_2 = 0;
+    size_t revisit_4 = 0;
+    size_t revisit_8 = 0;
+    size_t revisit_16 = 0;
+    size_t revisit_64 = 0;
+    size_t revisit_256 = 0;
+    size_t revisit_1024 = 0;
+    size_t revisit_4096 = 0;
+    size_t revisit_above_4096 = 0;
+
+    size_t visit_total = 0;
+    size_t revisit_total = 0;
+
+    for (uint i = 0; i < _max_concurrent_workers; ++i) {
+      for(uint k = 0; k < mem_region_count; ++k) {
+        size_t count = _mem_region_retouch_index_last[i][j][k] -  _mem_region_retouch_index[i][j][k];
+        if (count == 0 || _mem_region_retouch_index[i][j][k] == 0) {
+
+        } else if (count <= 1) {
+          revisit_1++;
+        } else if (count <= 2) {
+          revisit_2++;
+        } else if (count <= 4) {
+          revisit_4++;
+        } else if (count <= 8) {
+          revisit_8++;
+        } else if (count <= 16) {
+          revisit_16++;
+        } else if (count <= 64) {
+          revisit_64++;
+        } else if (count <= 256) {
+          revisit_256++;
+        } else if (count <= 1024) {
+          revisit_1024++;
+        } else if (count <= 4096) {
+          revisit_4096++;
+        } else {
+          revisit_above_4096++;
+        }
+      }
+    }
+    log_info(gc)("mem region retouch distance %u pages: %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu, %lu",
       1U << j, revisit_1, revisit_2, revisit_4, revisit_8,
       revisit_16, revisit_64, revisit_256,
       revisit_1024, revisit_4096,

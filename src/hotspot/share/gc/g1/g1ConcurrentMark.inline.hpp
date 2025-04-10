@@ -229,7 +229,12 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
 
     for(int i = 0; i < SIZE_OF_MARK_MEM_REGION_BIN; ++i) {
       if(mem_region_cur != mem_region_prev) {
+        _cm->_present_index[i] += 1;
         _cm->_mem_region_retouch_counts[_worker_id][i][mem_region_cur] += 1;
+        if( _cm->_mem_region_retouch_index[_worker_id][i][mem_region_cur] == 0){
+          _cm->_mem_region_retouch_index[_worker_id][i][mem_region_cur] = _cm->_present_index[i];
+        }
+        _cm->_mem_region_retouch_index_last[_worker_id][i][mem_region_cur] = _cm->_present_index[i];
       }
       mem_region_cur >>= 1;
       mem_region_prev >>= 1;
