@@ -61,3 +61,17 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_post_entry(volatile G1CardTa
   G1DirtyCardQueue& queue = G1ThreadLocalData::dirty_card_queue(thread);
   G1BarrierSet::dirty_card_queue_set().enqueue(queue, card_addr);
 JRT_END
+
+JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_data_structure_entry(oopDesc* from,
+                                                                        oopDesc* old_to,
+                                                                        JavaThread* thread)) {
+  assert(thread == JavaThread::current(), "pre-condition");
+  assert(from != nullptr, "should be optimized out");
+  assert(old_to != nullptr, "should be optimized out");
+  assert(oopDesc::is_oop(from, true /* ignore mark word */), "Error");
+  assert(oopDesc::is_oop(old_to, true /* ignore mark word */), "Error");
+
+  // store the original value that was in the field reference
+  SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
+  G1BarrierSet::satb_mark_queue_set().enqueue_known_active(queue, from);
+} JRT_END

@@ -28,6 +28,7 @@
 #include "gc/g1/g1DirtyCardQueue.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "gc/shared/satbMarkQueue.hpp"
+#include "gc/shared/referenceHashMap.hpp"
 #include "runtime/javaThread.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/sizes.hpp"
@@ -36,6 +37,7 @@ class G1ThreadLocalData {
 private:
   SATBMarkQueue _satb_mark_queue;
   G1DirtyCardQueue _dirty_card_queue;
+  ReferenceHashMap _reference_hash_map;
 
   G1ThreadLocalData() :
       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),

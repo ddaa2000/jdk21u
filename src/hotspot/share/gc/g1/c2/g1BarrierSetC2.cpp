@@ -53,6 +53,20 @@ const TypeFunc *G1BarrierSetC2::write_ref_field_pre_entry_Type() {
   return TypeFunc::make(domain, range);
 }
 
+const TypeFunc *G1BarrierSetC2::write_ref_field_data_structure_Type() {
+  const Type **fields = TypeTuple::fields(3);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL; // from
+  fields[TypeFunc::Parms+1] = TypeInstPtr::NOTNULL; // old_to
+  fields[TypeFunc::Parms+2] = TypeRawPtr::NOTNULL; // thread
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+3, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
 const TypeFunc *G1BarrierSetC2::write_ref_field_post_entry_Type() {
   const Type **fields = TypeTuple::fields(2);
   fields[TypeFunc::Parms+0] = TypeRawPtr::NOTNULL;  // Card addr
@@ -236,6 +250,17 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
 
   // Now some of the values
   Node* marking = __ load(__ ctrl(), marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
+
+  if (do_load) {
+    // load original value
+    pre_val = __ load(__ ctrl(), adr, val_type, bt, alias_idx, false, MemNode::unordered, LoadNode::Pinned);
+  }
+
+  // if (pre_val != nullptr)
+  __ if_then(pre_val, BoolTest::ne, kit->null()); {
+    const TypeFunc *tf = write_ref_field_data_structure_Type();
+    __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_data_structure_entry), "write_ref_field_data_structure_entry", obj, pre_val, tls);
+  }
 
   // if (!marking)
   __ if_then(marking, BoolTest::ne, zero, unlikely); {
@@ -673,7 +698,7 @@ bool G1BarrierSetC2::is_gc_barrier_node(Node* node) const {
     return false;
   }
 
-  return strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
+  return strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0 || strcmp(call->_name, "write_ref_field_data_structure_entry") == 0;
 }
 
 bool G1BarrierSetC2::is_g1_pre_val_load(Node* n) {
