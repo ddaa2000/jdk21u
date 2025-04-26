@@ -254,13 +254,16 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
   if (do_load) {
     // load original value
     pre_val = __ load(__ ctrl(), adr, val_type, bt, alias_idx, false, MemNode::unordered, LoadNode::Pinned);
+    // if (pre_val != nullptr)
+    __ if_then(pre_val, BoolTest::ne, kit->null()); {
+      // const TypeFunc *tf = write_ref_field_pre_entry_Type();
+      // __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_pre_entry), "write_ref_field_pre_entry", obj, tls);
+      const TypeFunc *tf = write_ref_field_data_structure_Type();
+      __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_data_structure_entry), "write_ref_field_data_structure_entry", obj, pre_val, tls);
+    } __ end_if();
   }
 
-  // if (pre_val != nullptr)
-  __ if_then(pre_val, BoolTest::ne, kit->null()); {
-    const TypeFunc *tf = write_ref_field_data_structure_Type();
-    __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_data_structure_entry), "write_ref_field_data_structure_entry", obj, pre_val, tls);
-  }
+
 
   // if (!marking)
   __ if_then(marking, BoolTest::ne, zero, unlikely); {

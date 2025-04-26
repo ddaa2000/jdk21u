@@ -72,6 +72,6 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_data_structure_entry(oopDesc
   assert(oopDesc::is_oop(old_to, true /* ignore mark word */), "Error");
 
   // store the original value that was in the field reference
-  SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
-  G1BarrierSet::satb_mark_queue_set().enqueue_known_active(queue, from);
+  ReferenceHashMap& map = G1ThreadLocalData::reference_hash_map(thread);
+  map.add_or_inc(from->klass()->name(), old_to->klass()->name(), 1, old_to->size());
 } JRT_END

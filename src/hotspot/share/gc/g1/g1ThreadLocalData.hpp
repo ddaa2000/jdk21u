@@ -73,6 +73,10 @@ public:
     return data(thread)->_dirty_card_queue;
   }
 
+  static ReferenceHashMap& reference_hash_map(Thread* thread) {
+    return data(thread)->_reference_hash_map;
+  }
+
   static ByteSize satb_mark_queue_active_offset() {
     return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_active();
   }

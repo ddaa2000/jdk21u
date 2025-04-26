@@ -196,6 +196,8 @@ private:
   G1BlockOffsetTable* _bot;
 
   ReferenceHashMap _reference_hash_map;
+  ReferenceHashMap _remove_hash_map;
+  Mutex _remove_hash_map_lock;
   // ReferenceDictionary* _reference_dictionary;
 
   class MergeEntryClosure {
@@ -227,8 +229,18 @@ public:
     return &_reference_hash_map;
   }
 
+  ReferenceHashMap* remove_hash_map() {
+    return &_remove_hash_map;
+  }
+
   void merge_reference_hash_map(ReferenceHashMap* other_map) {
     MergeEntryClosure cl(&_reference_hash_map);
+    other_map->for_each_closure(&cl);
+  }
+
+  void merge_remove_hash_map(ReferenceHashMap* other_map) {
+    MutexLocker ml(&_remove_hash_map_lock, Mutex::_no_safepoint_check_flag);
+    MergeEntryClosure cl(&_remove_hash_map);
     other_map->for_each_closure(&cl);
   }
 

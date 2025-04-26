@@ -1238,6 +1238,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _bot(nullptr),
   // _reference_dictionary(new ReferenceDictionary(2000)),
   _reference_hash_map(20),
+  _remove_hash_map(20),
+  _remove_hash_map_lock(Mutex::nosafepoint, "remove hash map lock"),
   _listener(),
   _numa(G1NUMA::create()),
   _hrm(),
@@ -1543,7 +1545,8 @@ void G1CollectedHeap::stop() {
   // Stop all concurrent threads. We do this to make sure these threads
   // do not continue to execute and access resources (e.g. logging)
   // that are destroyed during shutdown.
-  reference_hash_map()->print_all();
+  // reference_hash_map()->print_all();
+  remove_hash_map()->print_all();
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();
