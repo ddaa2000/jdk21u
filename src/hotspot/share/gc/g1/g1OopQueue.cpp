@@ -24,38 +24,47 @@
 
 #include "precompiled.hpp"
 #include "gc/g1/g1OopQueue.hpp"
-#include "gc/g1/heapRegion.hpp"
-#include "gc/shared/satbMarkQueue.hpp"
-#include "oops/oop.hpp"
-#include "utilities/debug.hpp"
-#include "utilities/globalDefinitions.hpp"
+#include "gc/g1/g1ThreadLocalData.hpp"
+#include "oops/oop.inline.hpp"
 
 G1OopQueue::G1OopQueue() :
   _buffer(nullptr),
-  _index(G1OopBufferSize * 2),
-{
-  _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
-}
+  _index(0)
+  {
+    _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
+    set_index(G1OopBufferSize * 2);
+  }
 
-G1OopQueue::~G1OopQueue() : {
-  delete[] _buffer;
+G1OopQueue::~G1OopQueue(){
+  FREE_C_HEAP_ARRAY(oopDesc*, _buffer);
 }
 
 void G1OopQueue::flush(ReferenceHashMap& map) {
-  for(size_t i = G1OopBufferSize * 2 - 2; i >= _index; i -= 2 ){
+  size_t idx = index();
+  for(size_t i = idx; i < G1OopBufferSize * 2; i += 2 ){
     oopDesc* from = _buffer[i];
     oopDesc* to = _buffer[i + 1];
     map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
   }
-  _index = G1OopBufferSize * 2;
+  set_index(G1OopBufferSize * 2);
 }
 
 void G1OopQueue::enqueue(ReferenceHashMap& map, oopDesc* from, oopDesc* to){
-  if(_index == 0){
+  size_t idx = index();
+  if(idx == 0){
     flush(map);
+    idx = index();
   }
-  _index -= 2;
-  buffer[_index] = from;
-  buffer[_index + 1] = to;
+  idx -= 2;
+  _buffer[idx] = from;
+  _buffer[idx + 1] = to;
+  set_index(idx);
 }
 
+void G1OopQueue::flush_all(){
+  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *thread = jtiwh.next();) {
+    G1OopQueue& queue = G1ThreadLocalData::ref_queue(thread);
+    ReferenceHashMap& map = G1ThreadLocalData::reference_hash_map(thread);
+    queue.flush(map);
+  }
+}

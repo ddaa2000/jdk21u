@@ -251,15 +251,17 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
   // Now some of the values
   Node* marking = __ load(__ ctrl(), marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
 
+  // Node* pre_pre_val = pre_val;
+
   if (do_load) {
     // load original value
 
     const int ref_index_offset = in_bytes(G1ThreadLocalData::ref_queue_index_offset());
     const int ref_buffer_offset   = in_bytes(G1ThreadLocalData::ref_queue_buf_offset());
 
-    pre_val = __ load(__ ctrl(), adr, val_type, bt, alias_idx, false, MemNode::unordered, LoadNode::Pinned);
+    Node* pre_ref_val = __ load(__ ctrl(), adr, val_type, bt, alias_idx, false, MemNode::unordered, LoadNode::Pinned);
     // if (pre_val != nullptr)
-    __ if_then(pre_val, BoolTest::ne, kit->null()); {
+    __ if_then(pre_ref_val, BoolTest::ne, kit->null()); {
 
       Node* ref_buffer_adr = __ AddP(no_base, tls, __ ConX(ref_buffer_offset));
       Node* ref_index_adr  = __ AddP(no_base, tls, __ ConX(ref_index_offset));
@@ -278,22 +280,21 @@ void G1BarrierSetC2::pre_barrier(GraphKit* kit,
         Node *log_to_addr   = __ AddP(no_base, log_from_addr, __ ConX(1 * sizeof(intptr_t)));
 
         __ store(__ ctrl(), log_from_addr, obj, T_OBJECT, Compile::AliasIdxRaw, MemNode::unordered);
-        __ store(__ ctrl(), log_to_addr, pre_val, T_OBJECT, Compile::AliasIdxRaw, MemNode::unordered);
+        __ store(__ ctrl(), log_to_addr, pre_ref_val, T_OBJECT, Compile::AliasIdxRaw, MemNode::unordered);
 
         // update the index
+        // __ store(__ ctrl(), ref_index_adr, __ ConX(0), ref_index_bt, Compile::AliasIdxRaw, MemNode::unordered);
         __ store(__ ctrl(), ref_index_adr, next_ref_index, ref_index_bt, Compile::AliasIdxRaw, MemNode::unordered);
-
       } __ else_(); {
-
         // logging buffer is full, call the runtime
         const TypeFunc *tf = write_ref_field_data_structure_Type();
-        __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_data_structure_entry), "write_ref_field_data_structure_entry", obj, pre_val, tls);
+        __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_data_structure_entry), "write_ref_field_data_structure_entry", obj, pre_ref_val, tls);
       } __ end_if();  // (!index)
 
-      // const TypeFunc *tf = write_ref_field_pre_entry_Type();
-      // __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::write_ref_field_pre_entry), "write_ref_field_pre_entry", obj, tls);
     } __ end_if();
   }
+
+  // pre_val = pre_pre_val;
 
 
 

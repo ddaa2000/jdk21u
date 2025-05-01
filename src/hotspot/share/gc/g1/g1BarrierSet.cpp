@@ -160,6 +160,9 @@ void G1BarrierSet::on_thread_attach(Thread* thread) {
 
 void G1BarrierSet::on_thread_detach(Thread* thread) {
   // Flush any deferred card marks.
+  // if(!thread->is_Java_thread()){
+  //   ShouldNotReachHere();
+  // }
   CardTableBarrierSet::on_thread_detach(thread);
   {
     SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
