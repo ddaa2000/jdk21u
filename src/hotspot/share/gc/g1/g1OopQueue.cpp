@@ -25,6 +25,8 @@
 #include "precompiled.hpp"
 #include "gc/g1/g1OopQueue.hpp"
 #include "gc/g1/g1ThreadLocalData.hpp"
+#include "gc/g1/g1CollectedHeap.hpp"
+#include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "oops/oop.inline.hpp"
 
 G1OopQueue::G1OopQueue() :
@@ -40,11 +42,31 @@ G1OopQueue::~G1OopQueue(){
 }
 
 void G1OopQueue::flush(ReferenceHashMap& map) {
+  G1CollectedHeap* g1h = G1CollectedHeap::heap();
   size_t idx = index();
+  Symbol* pre_from = nullptr;
+  Symbol* pre_to = nullptr;
+  size_t pre_count = 0;
+  size_t pre_size = 0;
   for(size_t i = idx; i < G1OopBufferSize * 2; i += 2 ){
     oopDesc* from = _buffer[i];
     oopDesc* to = _buffer[i + 1];
-    map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
+    if(g1h->heap_region_containing(to)->is_young()){
+      continue;
+    }
+    if(pre_from == from->klass()->name() && pre_to == to->klass()->name()){
+      pre_count++;
+      pre_size += to->size();
+    } else {
+      if(pre_from != nullptr){
+        map.add_or_inc(pre_from, pre_to, pre_count, pre_size);
+      }
+      pre_from = from->klass()->name();
+      pre_to = to->klass()->name();
+      pre_count = 1;
+      pre_size = to->size();
+    }
+    // map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
   }
   set_index(G1OopBufferSize * 2);
 }
