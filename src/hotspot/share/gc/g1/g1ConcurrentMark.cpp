@@ -1411,6 +1411,8 @@ void G1ConcurrentMark::remark() {
   _remark_weak_ref_times.add((now - mark_work_end) * 1000.0);
   _remark_times.add((now - start) * 1000.0);
 
+  _g1h->print_pages_stats();
+
   policy->record_concurrent_mark_remark_end();
 }
 

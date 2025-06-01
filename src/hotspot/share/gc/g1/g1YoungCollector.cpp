@@ -1058,6 +1058,7 @@ void G1YoungCollector::collect() {
     // policy for the collection deliberately elides verification (and some
     // other trivial setup above).
     policy()->record_young_collection_start();
+    _g1h->pages_tracking_cleanup();
 
     pre_evacuate_collection_set(jtm.evacuation_info());
 

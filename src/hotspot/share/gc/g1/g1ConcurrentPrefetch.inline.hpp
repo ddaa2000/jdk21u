@@ -344,6 +344,7 @@ inline bool G1PFTask::make_reference_grey(oop obj) {
 }
 
 inline bool G1PFTask::make_reference_black(oop obj) {
+  G1CollectedHeap::heap()->page_prefetch_at(obj);
   if (!_pf->mark_black_in_bitmap(_worker_id, obj)) {
     return false;
   }
@@ -369,6 +370,7 @@ inline bool G1PFTask::make_reference_black(oop obj) {
 }
 
 inline bool G1PFTask::make_prefetch_reference_black(oop obj) {
+  G1CollectedHeap::heap()->page_prefetch_at(obj);
   if (!_pf->mark_prefetch_black_in_bitmap(_worker_id, obj, this)) {
     return false;
   }
@@ -397,6 +399,7 @@ inline bool G1PFTask::make_prefetch_reference_black(oop obj) {
 template <class T>
 inline bool G1PFTask::deal_with_reference(T* p) {
   // increment_refs_reached();
+  G1CollectedHeap::heap()->page_prefetch_at(p);
   oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
   if (obj == NULL) {
     return false;

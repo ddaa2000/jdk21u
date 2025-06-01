@@ -1344,6 +1344,38 @@ public:
 
   // Used to print information about locations in the hs_err file.
   bool print_location(outputStream* st, void* addr) const override;
+
+private:
+  bool* pages_marked;
+  bool* pages_prefetched;
+public:
+  void pages_tracking_cleanup(){
+    for(size_t i = 0; i < 32 * 1024 * 1024 / 4; i++){
+      pages_marked[i] = false;
+      pages_prefetched[i] = false;
+    }
+  }
+  void print_pages_stats(){
+    size_t marked_count = 0;
+    size_t prefetched_count = 0;
+    size_t both_count = 0;
+    for(size_t i = 0; i < 32 * 1024 * 1024 / 4; i++){
+      marked_count += pages_marked ? 1 : 0;
+      prefetched_count += pages_prefetched ? 1 : 0;
+      both_count += (pages_prefetched && pages_marked) ? 1 : 0;
+    }
+    log_info(gc)("marked %lu, prefetched %lu, both %lu", marked_count, prefetched_count, both_count);
+  }
+
+  void page_mark_at(HeapWord* addr){
+    size_t page_id = ((size_t)addr - SEMERU_START_ADDR)/4096;
+    pages_marked[page_id] = true;
+  }
+
+  void page_prefetch_at(HeapWord* addr){
+    size_t page_id = ((size_t)addr - SEMERU_START_ADDR)/4096;
+    pages_prefetched[page_id] = true;
+  }
 };
 
 // Scoped object that performs common pre- and post-gc heap printing operations.

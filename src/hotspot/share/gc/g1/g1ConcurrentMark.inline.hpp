@@ -218,6 +218,7 @@ inline void G1CMTask::abort_marking_if_regular_check_fail() {
 }
 
 inline bool G1CMTask::make_reference_grey(oop obj) {
+  G1CollectedHeap::heap()->page_mark_at(obj);
   if (!_cm->mark_in_bitmap(_worker_id, obj)) {
     return false;
   }
@@ -262,6 +263,7 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
 
 template <class T>
 inline bool G1CMTask::deal_with_reference(T* p) {
+  G1CollectedHeap::heap()->page_mark_at(p);
   increment_refs_reached();
   oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
   if (obj == nullptr) {
