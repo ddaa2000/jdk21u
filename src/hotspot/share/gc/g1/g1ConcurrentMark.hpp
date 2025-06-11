@@ -117,8 +117,11 @@ class G1CMIsAliveClosure : public BoolObjectClosure {
   G1CollectedHeap* _g1h;
   G1ConcurrentMark* _cm;
 public:
-  G1CMIsAliveClosure(G1CollectedHeap* g1h);
+  G1CMIsAliveClosure(G1CollectedHeap* g1h) : _g1h(g1h){};
   bool do_object_b(oop obj);
+  void set_concurrent_mark(G1ConcurrentMark* cm) {
+    _cm = cm;
+  }
 };
 
 class G1CMSubjectToDiscoveryClosure : public BoolObjectClosure {

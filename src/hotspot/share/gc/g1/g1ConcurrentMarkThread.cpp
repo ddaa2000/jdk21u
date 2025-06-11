@@ -308,7 +308,9 @@ void G1ConcurrentMarkThread::concurrent_mark_cycle_do() {
   //   _cm->set_should_do_detailed_concurrent_gc(false);
   // }
 
-  _cm->set_should_do_detailed_concurrent_gc(true);
+  // _cm->set_should_do_detailed_concurrent_gc(true);
+  _cm->set_should_do_detailed_concurrent_gc(false);
+
 
 
   g1h->region_class_hash_map()->clear();

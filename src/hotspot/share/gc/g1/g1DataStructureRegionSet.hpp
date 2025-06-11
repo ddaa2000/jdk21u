@@ -95,7 +95,8 @@ private:
     }
     LinkedListImpl<HeapRegion*> _regions;
     SortedLinkedList<G1CardTable::CardValue*, compare> _out_cards;
-    SortedLinkedList<G1CardTable::CardValue*, compare> _out_cards_data;
+    // SortedLinkedList<G1CardTable::CardValue*, compare> _out_cards_data;
+    LinkedListImpl<G1DataStructureRegionSet*> _out_instances;
     G1DataStructure* _data_structure;
     OldDataStructureGCAllocRegion _alloc_region;
     // G1PLABAllocator::PLABData _plab_data;
@@ -163,16 +164,21 @@ public:
     void clear_out_cards(){
         // log_info(gc)("out cards %lu, out cards data %lu", _out_cards.size(), _out_cards_data.size());
         _out_cards.clear();
-        _out_cards_data.clear();
+        // _out_cards_data.clear();
+        _out_instances.clear();
     }
 
     void add_out_card(G1CardTable::CardValue* card) {
         _out_cards.add(card);
     }
 
-    void add_out_card_data(G1CardTable::CardValue* card) {
-        _out_cards_data.add(card);
+    void add_out_instance(G1DataStructureRegionSet* instance) {
+        _out_instances.add(instance);
     }
+
+    // void add_out_card_data(G1CardTable::CardValue* card) {
+    //     _out_cards_data.add(card);
+    // }
 
     bool is_alive(){
         return _is_alive;
@@ -201,6 +207,15 @@ public:
     }
 
     template<typename Func> void scan_cards(Func&& f);
+
+    template<typename Func> void scan_out_instances(Func&& f) {
+        LinkedListNode<G1DataStructureRegionSet*>* p = _out_instances.head();
+        while (p != nullptr) {
+            G1DataStructureRegionSet* instance = *p->data();
+            f(instance);
+            p = p->next();
+        }
+    }
     // void scan_cards(Func&& f){
     //     HeapRegion* present_region = nullptr;
     //     LinkedListNode<G1CardTable::CardValue*>* p = _out_cards.head();
