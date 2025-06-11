@@ -292,6 +292,18 @@ public:
 
   // Do some sanity checking.
   void verify_optional() PRODUCT_RETURN;
+
+private:
+  bool _do_reserve_for_full;
+  
+  void set_do_reserve_for_full(bool do_reserve) {
+    assert(!_do_reserve_for_full, "already set");
+    _do_reserve_for_full = do_reserve;
+  }
+
+  bool do_reserve_for_full() const {
+    return _do_reserve_for_full;
+  }
 };
 
 // The HeapRegionClaimer is used during parallel iteration over heap regions,

@@ -192,6 +192,11 @@ HeapRegion* G1CollectedHeap::new_region(size_t word_size,
       // region size, the free list should in theory not be empty.
       // In either case allocate_free_region() will check for null.
       res = _hrm.allocate_free_region(type, node_index);
+      if(res == nullptr) { //hua: expand again as the new full gc reserve algorithm might want more regions
+        if (expand_single_region(node_index)) {
+          res = _hrm.allocate_free_region(type, node_index);
+        }
+      }
     }
   }
   return res;

@@ -68,7 +68,8 @@ HeapRegionManager::HeapRegionManager() :
   _allocated_heapregions_length(0),
   _regions(), _heap_mapper(nullptr),
   _bitmap_mapper(nullptr),
-  _free_list("Free list", new MasterFreeRegionListChecker())
+  _free_list("Free list", new MasterFreeRegionListChecker()),
+  _do_reserve_for_full(true)
 { }
 
 void HeapRegionManager::initialize(G1RegionToSpaceMapper* heap_storage,
@@ -94,6 +95,11 @@ HeapRegion* HeapRegionManager::allocate_free_region(HeapRegionType type, uint re
   bool from_head = !type.is_young();
   G1NUMA* numa = G1NUMA::numa();
 
+  if(num_free_regions() - 1 <= MAX2(10, length() / 20) && do_reserve_for_full()) {
+    log_info(gc)("full reserve limit reached");
+    return nullptr;
+  }
+
   if (requested_node_index != G1NUMA::AnyNodeIndex && numa->is_enabled()) {
     // Try to allocate with requested node index.
     hr = _free_list.remove_region_with_node_index(from_head, requested_node_index);
@@ -118,6 +124,10 @@ HeapRegion* HeapRegionManager::allocate_free_region(HeapRegionType type, uint re
 }
 
 HeapRegion* HeapRegionManager::allocate_humongous_from_free_list(uint num_regions) {
+  if(num_free_regions() - num_regions <= MAX2(10, length() / 20) && do_reserve_for_full()) {
+    log_info(gc)("full reserve limit reached");
+    return nullptr;
+  }
   uint candidate = find_contiguous_in_free_list(num_regions);
   if (candidate == G1_NO_HRM_INDEX) {
     return nullptr;
@@ -126,6 +136,20 @@ HeapRegion* HeapRegionManager::allocate_humongous_from_free_list(uint num_region
 }
 
 HeapRegion* HeapRegionManager::allocate_humongous_allow_expand(uint num_regions) {
+  if(num_free_regions() - num_regions <= MAX2(10, length() / 20) && do_reserve_for_full()) {
+    bool expanded = false;
+    for(uint i = 0; i < available(); i++) {
+      if(num_free_regions() + i - num_regions <= MAX2(10, (length() + i) / 20)) {
+        expand_by(i, G1CollectedHeap::heap()->workers());
+        expanded = true;
+        break;
+      }
+    }
+    if(!expanded) {
+      log_info(gc)("full reserve limit reached");
+      return nullptr;
+    }
+  }
   uint candidate = find_contiguous_allow_expand(num_regions);
   if (candidate == G1_NO_HRM_INDEX) {
     return nullptr;
