@@ -646,6 +646,8 @@ private:
 
 private:
   bool _should_do_detailed_concurrent_gc;
+  bool _full_gc_just_now;
+
 
 public:
   // Returns true if we should do detailed concurrent GC logging.
@@ -656,6 +658,18 @@ public:
   // Sets whether we should do detailed concurrent GC logging.
   inline void set_should_do_detailed_concurrent_gc(bool value) {
     _should_do_detailed_concurrent_gc = value;
+  }
+
+  // Sets whether we should do detailed concurrent GC logging.
+  inline void set_should_do_detailed_concurrent_gc(bool value) {
+    _should_do_detailed_concurrent_gc = value;
+  }
+
+  inline bool full_gc_just_now() const {
+    return _full_gc_just_now;
+  }
+  inline void set_full_gc_just_now(bool value) {
+    _full_gc_just_now = value;
   }
 };
 

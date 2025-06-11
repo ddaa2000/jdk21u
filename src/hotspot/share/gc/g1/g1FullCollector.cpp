@@ -236,9 +236,10 @@ void G1FullCollector::collect() {
   phase5_reset_metadata();
 
   if(G1LogRemset){
-    // _heap->rem_set()->log_remset();
+    _heap->rem_set()->log_remset();
     // _g1h->print_region_types();
   }
+  _heap->concurrent_mark()->set_full_gc_just_now(true);
 
 
   G1CollectedHeap::finish_codecache_marking_cycle();
