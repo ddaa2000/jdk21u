@@ -104,7 +104,9 @@ G1DataStructureRegionSet::G1DataStructureRegionSet(G1CollectedHeap* heap, G1Data
     _retained_old_region(nullptr),
     _regions_lock(Mutex::service-2, "regions lock"),
     _id(id),
-    _is_alive(false) { 
+    _is_alive(false),
+    _root_oop(nullptr),
+    _has_marked_detailed(false) { 
     
     // size_t _tolerated_refills = 0;
     

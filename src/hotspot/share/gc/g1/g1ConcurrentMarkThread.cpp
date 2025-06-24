@@ -181,15 +181,18 @@ bool G1ConcurrentMarkThread::phase_mark_loop() {
   for (uint iter = 1; true; ++iter) {
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
 
-    // log_info(gc)("before mark from roots");
+    log_info(gc)("before mark from roots");
     // if(!_cm->should_do_detailed_concurrent_gc()){
     //   g1h->data_structure_manager()->verify_all();
     // }
 
     // Subphase 1: Mark From Roots.
+    // g1h->data_structure_manager()->print_all_marked_roots(_cm->mark_bitmap());
     if (subphase_mark_from_roots()) return true;
 
-    // log_info(gc)("before preclean");
+    log_info(gc)("before preclean");
+    // g1h->data_structure_manager()->print_all_marked_roots(_cm->mark_bitmap());
+
     // if(!_cm->should_do_detailed_concurrent_gc()){
     //   g1h->data_structure_manager()->verify_all();
     // }

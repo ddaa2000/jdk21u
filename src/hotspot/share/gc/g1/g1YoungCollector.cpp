@@ -1082,6 +1082,8 @@ void G1YoungCollector::collect() {
         x += 1;
       }
     }
+    cm->set_should_do_detailed_concurrent_gc(true);
+
 
 
 

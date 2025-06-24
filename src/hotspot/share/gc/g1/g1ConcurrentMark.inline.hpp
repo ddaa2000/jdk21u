@@ -85,6 +85,12 @@ inline bool G1ConcurrentMark::mark_in_bitmap(uint const worker_id, oop const obj
 
   bool success = _mark_bitmap.par_mark(obj);
   if (success) {
+    G1DataStructureRegionSet* data_structure_instance = hr->data_structure();
+    if(data_structure_instance != nullptr) {
+      if(obj == data_structure_instance->root_oop()){
+        log_info(gc)("mark root alive ds %u, obj %p", data_structure_instance->id(), obj);
+      }
+    }
     add_to_liveness(worker_id, obj, obj->size());
     if(G1CollectRegionClass){
       task(worker_id)->region_class_hash_map()->add_or_inc(hr, obj->klass()->name(), 1, obj->size());
@@ -212,6 +218,9 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
         if (out_instance->set_alive_par()) {
           log_info(gc)("set alive par whole out");
           if (_data_structure_to_mark_stack && !_cm->should_do_detailed_concurrent_gc()){
+            log_info(gc)("ds %u (%lu bytes) to ds %u (%lu bytes)",
+                         data_structure_instance->id(), data_structure_instance->total_used(),
+                         out_instance->id(), out_instance->total_used());
             G1TaskQueueEntry entry = G1TaskQueueEntry::from_data_structure_instance(out_instance);
             push(entry);
           } else {

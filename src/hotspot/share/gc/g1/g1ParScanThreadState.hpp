@@ -172,7 +172,8 @@ private:
                                size_t word_sz,
                                uint age,
                                uint node_index,
-                               G1DataStructureRegionSet* data_structure);
+                               G1DataStructureRegionSet*& data_structure,
+                               bool& is_new_root);
 
   void undo_allocation(G1HeapRegionAttr dest_addr,
                        HeapWord* obj_ptr,

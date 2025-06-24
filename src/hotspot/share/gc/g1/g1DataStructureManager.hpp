@@ -60,7 +60,7 @@ public:
     G1DataStructureManager() : _data_structures(), _data_structure_types(), _present_id(0), 
         _allocator(nullptr), _evacuation_info(nullptr), _data_structures_lock(Mutex::nosafepoint, "data_structures lock") {}
     
-    G1DataStructureRegionSet* get_data_structure(oop from_oop, oop to_oop);
+    G1DataStructureRegionSet* get_data_structure(oop from_oop, oop to_oop, bool& is_new_root);
     void init_data_structure_alloc_regions(G1Allocator* allocator, G1EvacInfo* evacuation_info);
     void release_data_structure_alloc_regions();
     void abandon_data_structure_alloc_regions();
@@ -86,6 +86,9 @@ public:
     void remove_instance(G1DataStructureRegionSet* data_structure_instance);
     void remove_dead_instances();
     void verify_all();
+    void update_root_liveness(G1CMBitMap* bitmap);
+    void print_all_marked_roots(G1CMBitMap* bitmap);
+    void print_instance_status();
 };
 
 #endif // SHARE_GC_G1_G1DIRTYCARDQUEUE_HPP

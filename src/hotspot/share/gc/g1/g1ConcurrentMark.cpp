@@ -1251,7 +1251,9 @@ class UpdateDataStructureLiveSize : public HeapRegionClosure {
 public:
   bool do_heap_region(HeapRegion* r) {
     if(r->data_structure() != nullptr) {
+      // if(!r->data_structure()->is_alive() && !r->data_structure()->should_mark_detailed()) {
       if(!r->data_structure()->is_alive()) {
+
         if(r->top_at_mark_start() != r->top()) {
           r->data_structure()->set_alive(true);
 //          log_info(gc)("set data structure alive %u due to top growth", r->data_structure()->id());
@@ -1278,7 +1280,7 @@ void G1ConcurrentMark::remark() {
 
   verify_during_pause(G1HeapVerifier::G1VerifyRemark, VerifyLocation::RemarkBefore);
 
-  _g1h->allocator()->abandon_gc_alloc_regions();
+  // _g1h->allocator()->abandon_gc_alloc_regions();
 
   if(!should_do_detailed_concurrent_gc()){
 
@@ -1375,6 +1377,12 @@ void G1ConcurrentMark::remark() {
 
       _needs_remembered_set_rebuild = (cl.total_selected_for_rebuild() > 0);
     }
+
+    {
+      _g1h->data_structure_manager()->update_root_liveness(&_mark_bitmap);
+      _g1h->data_structure_manager()->print_instance_status();
+    }
+
     {
       GCTraceTime(Debug, gc, phases) debug("Reclaim Empty Regions", _gc_timer_cm);
       reclaim_empty_regions();

@@ -416,7 +416,8 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
                                                    size_t word_sz,
                                                    uint age,
                                                    uint node_index,
-                                                   G1DataStructureRegionSet* data_structure) {
+                                                   G1DataStructureRegionSet*& data_structure,
+                                                   bool& is_new_root) {
   HeapWord* obj_ptr = nullptr;
   // Try slow-path allocation unless we're allocating old and old is already full.
   if (!(dest_attr->is_old() && _old_gen_is_full)) {
@@ -428,7 +429,7 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
                                                            data_structure);
     if (obj_ptr == nullptr) {
       if(data_structure == nullptr){
-        data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+        data_structure = _plab_allocator->data_structure_region_set(from_obj, old, is_new_root);
       }
       obj_ptr = allocate_in_next_plab(dest_attr,
                                       word_sz,
@@ -492,8 +493,9 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
   G1DataStructureRegionSet* target_data_structure = nullptr;
+  bool is_new_root = false;
   if(dest_attr.is_old()){
-    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old, is_new_root);
   }
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){
@@ -508,7 +510,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // PLAB allocations should succeed most of the time, so we'll
   // normally check against null once and that's it.
   if (obj_ptr == nullptr) {
-    obj_ptr = allocate_copy_slow(&dest_attr, from_obj, old, word_sz, age, node_index, target_data_structure);
+    obj_ptr = allocate_copy_slow(&dest_attr, from_obj, old, word_sz, age, node_index, target_data_structure, is_new_root);
     if (obj_ptr == nullptr) {
       // This will either forward-to-self, or detect that someone else has
       // installed a forwarding pointer.
@@ -560,6 +562,9 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
       }
       _age_table.add(age, word_sz);
     } else {
+      if(target_data_structure != nullptr && is_new_root){
+        target_data_structure->set_root_oop(obj);
+      }
       // log_info(gc)("p is %p", p);
       // log_info(gc)("p is %p", _g1h->heap_region_containing_or_null((void*)p));
 
@@ -625,6 +630,9 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
     _scanner.set_from_oop(nullptr);
     return obj;
   } else {
+    // if(target_data_structure != nullptr && is_new_root){
+    //   _g1h->data_structure_manager()->remove_instance(target_data_structure);
+    // }
     _plab_allocator->undo_allocation(dest_attr, obj_ptr, word_sz, node_index, target_data_structure);
     return forward_ptr;
   }

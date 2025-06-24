@@ -104,6 +104,8 @@ private:
     Mutex _regions_lock;
     uint _id;
     volatile bool _is_alive;
+    oop _root_oop;
+    bool _has_marked_detailed;
 
 public:
     G1DataStructureRegionSet(G1CollectedHeap* heap, G1DataStructure* data_structure, uint id);
@@ -126,6 +128,9 @@ public:
 
     void remove_region(HeapRegion* region) {
         MutexLocker ml(&_regions_lock, Mutex::_no_safepoint_check_flag);
+        if(region->is_in(_root_oop)) {
+            _root_oop = nullptr;
+        }
         _regions.remove(region);
     }
 
@@ -161,11 +166,90 @@ public:
         return _id;
     }
 
+    void print_out_instances() {
+        LinkedListNode<G1DataStructureRegionSet*>* p = _out_instances.head();
+        while (p != nullptr) {
+            G1DataStructureRegionSet* instance = *p->data();
+            log_info(gc)("ds %u to ds %u", id(), instance->id());
+            p = p->next();
+        }
+    }
+
     void clear_out_cards(){
         log_info(gc)("out cards %lu, out cards data %lu", _out_cards.size(), _out_cards_data.size());
+        print_out_instances();
         _out_cards.clear();
         _out_cards_data.clear();
         _out_instances.clear();
+    }
+
+    oop root_oop(){
+        return _root_oop;
+    }
+
+    bool is_rootless(){
+        return _root_oop == nullptr;
+    }
+
+    void set_rootless(){
+        _root_oop = nullptr;
+    }
+
+    void set_root_oop(oop root_oop) {
+        _root_oop = root_oop;
+    }
+
+    void verify_root_oop(){
+        //check if root oop is in one of the regions
+        if(_root_oop != nullptr) {
+            bool found = false;
+            LinkedListNode<HeapRegion*>* p = _regions.head();
+            while (p != nullptr) {
+                HeapRegion* region = *p->data();
+                if(region->is_in(_root_oop)) {
+                    found = true;
+                    break;
+                }
+                p = p->next();
+            }
+            if(!found){
+                log_info(gc)("data structure %u root oop %p not in any region", id(), _root_oop);
+                ShouldNotReachHere();
+            }
+        }
+    }
+
+    size_t total_used(){
+        size_t total = 0;
+        LinkedListNode<HeapRegion*>* p = _regions.head();
+        while (p != nullptr) {
+            HeapRegion* region = *p->data();
+            total += region->used();
+            p = p->next();
+        }
+        return total;
+    }
+
+    size_t live_bytes(){
+        size_t total = 0;
+        LinkedListNode<HeapRegion*>* p = _regions.head();
+        while (p != nullptr) {
+            HeapRegion* region = *p->data();
+            total += region->live_bytes();
+            p = p->next();
+        }
+        return total;
+    }
+
+    size_t garbage_bytes(){
+        size_t total = 0;
+        LinkedListNode<HeapRegion*>* p = _regions.head();
+        while (p != nullptr) {
+            HeapRegion* region = *p->data();
+            total += region->garbage_bytes();
+            p = p->next();
+        }
+        return total;
     }
 
     void add_out_card(G1CardTable::CardValue* card) {
@@ -216,6 +300,11 @@ public:
             p = p->next();
         }
     }
+
+    bool should_mark_detailed(){
+        return is_rootless()  && !_has_marked_detailed;
+    }
+    
     // void scan_cards(Func&& f){
     //     HeapRegion* present_region = nullptr;
     //     LinkedListNode<G1CardTable::CardValue*>* p = _out_cards.head();
@@ -252,6 +341,13 @@ public:
     void verify();
 
     void find_out_card(HeapWord* addr);
+
+    void print_status(){
+        log_info(gc)("data structure %u (%s), num regions %lu, used %lu, live %lu, garbage %lu, live/used %.2lf, garbage/used %.2lf",
+                     id(), is_rootless()?"no root":"root", _regions.size(), total_used(), live_bytes(), garbage_bytes(),
+                     (double)live_bytes() / (double)total_used(),
+                     (double)garbage_bytes() / (double)total_used());
+    }
 
 };
 

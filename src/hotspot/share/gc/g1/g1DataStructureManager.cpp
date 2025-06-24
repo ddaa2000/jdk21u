@@ -25,7 +25,7 @@ G1DataStructure* G1DataStructureManager::get_data_structure_by_root(Symbol* root
     return nullptr;
 }
 
-G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oop, oop to_oop) {
+G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oop, oop to_oop, bool& is_new_root) {
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
     Symbol* to_symbol = to_oop->klass()->name();
     G1DataStructureRegionSet* data_structure = nullptr;
@@ -39,6 +39,7 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
 
         {
             log_info(gc)("create data structure for obj %p, class %s, at %p, id %u", to_oop, to_symbol->as_C_string(), data_structure, _present_id);
+            is_new_root = true;
             data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
             _data_structures.add(data_structure);
             _present_id++;
@@ -63,12 +64,13 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
                 OrderAccess::storestore();
                 if (from_region->data_structure() == nullptr) {
                     data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
+                    data_structure->set_root_oop(from_oop);
                     if(_allocator == nullptr || _evacuation_info == nullptr) {
                         ShouldNotReachHere();
                     }
 
                     {
-                        log_info(gc)("create data structure for obj %p, class %s, at %p, id %u", to_oop, from_symbol->as_C_string(), data_structure, _present_id);
+                        log_info(gc)("create data structure for humongous obj %p, class %s, at %p, id %u", from_oop, from_symbol->as_C_string(), data_structure, _present_id);
                         // log_info(gc)("create data structure for obj %p, class %s", to_oop, from_symbol->as_C_string());
                         data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
                         _data_structures.add(data_structure);
@@ -409,6 +411,71 @@ void G1DataStructureManager::verify_all(){
     while (p != nullptr) {
         G1DataStructureRegionSet* data_structure = *p->data();
         data_structure->verify();
+        p = p->next();
+    }
+}
+
+void G1DataStructureManager::update_root_liveness(G1CMBitMap* bitmap) {
+    G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+    LinkedListNode<G1DataStructureRegionSet*>* p = _data_structures.head();
+    while (p != nullptr) {
+        G1DataStructureRegionSet* data_structure = *p->data();
+        if(!data_structure->is_rootless()){
+            HeapRegion* hr = g1h->heap_region_containing(data_structure->root_oop());
+            data_structure->verify_root_oop();
+            if(!bitmap->is_marked(data_structure->root_oop()) && !hr->obj_allocated_since_marking_start(data_structure->root_oop())) {
+                data_structure->set_rootless();
+                log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+                log_info(gc)("data structure %u root not marked %p", data_structure->id(), data_structure->root_oop());
+                log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+            } else {
+                log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+                log_info(gc)("data structure %u root marked %p", data_structure->id(), data_structure->root_oop());
+                log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+            }
+        } else {
+            log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+            log_info(gc)("data structure %u root already not marked %p", data_structure->id(), data_structure->root_oop());
+            log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+        }
+        p = p->next();
+    }
+}
+
+void G1DataStructureManager::print_all_marked_roots(G1CMBitMap* bitmap) {
+    G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    log_info(gc)("print marked roots");
+    MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+    LinkedListNode<G1DataStructureRegionSet*>* p = _data_structures.head();
+    while (p != nullptr) {
+        G1DataStructureRegionSet* data_structure = *p->data();
+        if(!data_structure->is_rootless()){
+            HeapRegion* hr = g1h->heap_region_containing(data_structure->root_oop());
+            data_structure->verify_root_oop();
+            if(bitmap->is_marked(data_structure->root_oop()) || hr->obj_allocated_since_marking_start(data_structure->root_oop())) {
+                log_info(gc)("%p", cast_from_oop<HeapWord*>(data_structure->root_oop()));
+                log_info(gc)("data structure %u root marked %p", data_structure->id(), data_structure->root_oop());
+                log_info(gc)("%p", cast_from_oop<HeapWord*>(data_structure->root_oop()));
+
+            } else {
+                log_info(gc)("data structure %u root not marked %p", data_structure->id(), data_structure->root_oop());
+            }
+        } else {
+            log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+            log_info(gc)("data structure %u root already not marked %p", data_structure->id(), data_structure->root_oop());
+            log_info(gc)("%p %s", cast_from_oop<HeapWord*>(data_structure->root_oop()), data_structure->root_oop()==nullptr?"1":"0");
+        }
+        p = p->next();
+    }
+}
+
+void G1DataStructureManager::print_instance_status() {
+    MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+    LinkedListNode<G1DataStructureRegionSet*>* p = _data_structures.head();
+    while (p != nullptr) {
+        G1DataStructureRegionSet* data_structure = *p->data();
+        data_structure->print_status();
         p = p->next();
     }
 }
