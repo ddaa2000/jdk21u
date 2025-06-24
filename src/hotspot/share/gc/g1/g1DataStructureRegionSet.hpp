@@ -304,7 +304,6 @@ public:
     bool should_mark_detailed(){
         return is_rootless()  && !_has_marked_detailed;
     }
-    
     // void scan_cards(Func&& f){
     //     HeapRegion* present_region = nullptr;
     //     LinkedListNode<G1CardTable::CardValue*>* p = _out_cards.head();

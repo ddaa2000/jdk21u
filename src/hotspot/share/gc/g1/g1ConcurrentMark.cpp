@@ -1251,8 +1251,8 @@ class UpdateDataStructureLiveSize : public HeapRegionClosure {
 public:
   bool do_heap_region(HeapRegion* r) {
     if(r->data_structure() != nullptr) {
-      // if(!r->data_structure()->is_alive() && !r->data_structure()->should_mark_detailed()) {
       if(!r->data_structure()->is_alive()) {
+      // if(!r->data_structure()->is_alive()) {
 
         if(r->top_at_mark_start() != r->top()) {
           r->data_structure()->set_alive(true);
@@ -1327,9 +1327,19 @@ void G1ConcurrentMark::remark() {
   }
 
   if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
+
+  if(!should_do_detailed_concurrent_gc()){
     UpdateDataStructureLiveSize cl;
     _g1h->heap_region_iterate(&cl);
   }
+
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
 
   if(!should_do_detailed_concurrent_gc()){
     finalize_data_structure_marking();
@@ -1353,9 +1363,6 @@ void G1ConcurrentMark::remark() {
       flush_all_task_caches();
     }
 
-    // if(!should_do_detailed_concurrent_gc()){
-    //   _g1h->data_structure_manager()->verify_all();
-    // }
 
     // All marking completed. Check bitmap now as we will start to reset TAMSes
     // in parallel below so that we can not do this in the After-Remark verification.
@@ -1379,18 +1386,22 @@ void G1ConcurrentMark::remark() {
     }
 
     {
-      _g1h->data_structure_manager()->update_root_liveness(&_mark_bitmap);
-      _g1h->data_structure_manager()->print_instance_status();
-    }
-
-    {
       GCTraceTime(Debug, gc, phases) debug("Reclaim Empty Regions", _gc_timer_cm);
       reclaim_empty_regions();
+    }
+
+    if(!should_do_detailed_concurrent_gc()){
+      _g1h->data_structure_manager()->verify_all();
     }
 
      if(!should_do_detailed_concurrent_gc()){
        _g1h->data_structure_manager()->remove_dead_instances();
      }
+
+     if(!should_do_detailed_concurrent_gc()){
+      _g1h->data_structure_manager()->verify_all();
+    }
+
 
     // Clean out dead classes
     if (ClassUnloadingWithConcurrentMark) {
@@ -1428,14 +1439,26 @@ void G1ConcurrentMark::remark() {
     reset_marking_for_restart();
   }
 
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
+
+  {
+    _g1h->data_structure_manager()->update_root_liveness(&_mark_bitmap);
+    _g1h->data_structure_manager()->print_instance_status();
+  }
+
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
+
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
     // _g1h->print_region_types();
   }
 
-  // if(!should_do_detailed_concurrent_gc()) {
-  //   _g1h->data_structure_manager()->clear_all_out_cards();
-  // }
   // Statistics
   double now = os::elapsedTime();
   _remark_mark_times.add((mark_work_end - start) * 1000.0);
@@ -1967,7 +1990,7 @@ public:
   }
 
   void do_data_structure_instance(G1DataStructureRegionSet* data_structure_instance) {
-    if(data_structure_instance->is_alive()){
+    if(data_structure_instance->is_alive() && !data_structure_instance->should_mark_detailed()){
       // log_info(gc)("worker %u: pushing: data structure %u is alive, present %u, belong to %u, total %u", _worker_id, data_structure_instance->id(), _present, _present % _active_workers, _active_workers);
       if(_present % _active_workers == _worker_id){
         _task->push(G1TaskQueueEntry::from_data_structure_instance(data_structure_instance));
@@ -2056,6 +2079,11 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
   // constructor and pass values of the active workers
   // through the task.
 
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
+
   {
     StrongRootsScope srs(active_workers);
 
@@ -2069,6 +2097,11 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
     // _g1h->workers()->run_task(&remarkTask);
   }
 
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
+
   {
     StrongRootsScope srs(active_workers);
 
@@ -2081,6 +2114,11 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
     // _g1h->workers()->run_task(&pushTask);
     _g1h->workers()->run_task(&remarkTask);
   }
+
+  if(!should_do_detailed_concurrent_gc()){
+    _g1h->data_structure_manager()->verify_all();
+  }
+
 
   SATBMarkQueueSet& satb_mq_set = G1BarrierSet::satb_mark_queue_set();
   guarantee(has_overflown() ||
@@ -2915,7 +2953,7 @@ void G1CMTask::do_marking_step(double time_target_ms,
       // that is left.
       // If the iteration is successful, give up the region.
       G1DataStructureRegionSet* data_structure_instance = _curr_region->data_structure();
-      if(data_structure_instance != nullptr && !_cm->should_do_detailed_concurrent_gc()) {
+      if(data_structure_instance != nullptr && !_cm->should_do_detailed_concurrent_gc() && !data_structure_instance->should_mark_detailed()) {
         giveup_current_region();
         abort_marking_if_regular_check_fail();
       } else if (mr.is_empty()) {
@@ -3415,7 +3453,7 @@ void BuildRegionReverseRemsetClosure::do_card(uint region_idx, uint card_idx){
 
   // log_info(gc)("add card of region %u to region %u", region->hrm_index(), _to_region->hrm_index());
   assert((HeapWord*)_ct->byte_for_index(card_global_idx) < region->top(), "card must be smaller than top");
-  if(_to_region->data_structure()!= nullptr) {
+  if(_to_region->data_structure()!= nullptr && !_to_region->data_structure()->should_mark_detailed()) {
     data_structure_instance->add_out_instance(_to_region->data_structure());
     // data_structure_instance->add_out_card_data(cv);
     // data_structure_instance->add_out_card(cv);

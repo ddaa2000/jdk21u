@@ -56,7 +56,7 @@ inline bool G1CMIsAliveClosure::do_object_b(oop obj) {
     return true;
   }
   if(!_cm->should_do_detailed_concurrent_gc()) {
-    if (hr->data_structure() != nullptr && hr->data_structure()->is_alive()) {
+    if (hr->data_structure() != nullptr && hr->data_structure()->is_alive() && hr->data_structure()->should_mark_detailed()) {
       return true;
     }
   }
@@ -101,8 +101,15 @@ inline bool G1ConcurrentMark::mark_in_bitmap(uint const worker_id, oop const obj
     return success;
   }
 
+  G1DataStructureRegionSet* data_structure_instance = hr->data_structure();
+
+
+  if(data_structure_instance != nullptr && data_structure_instance->should_mark_detailed()){
+    data_structure_instance->set_alive(true);
+    return success;
+  }
+
   if(!success) {
-    G1DataStructureRegionSet* data_structure_instance = hr->data_structure();
     if(data_structure_instance != nullptr) {
       // log_info(gc)("set data structure alive %u", data_structure_instance->id());
       // log_info(gc)("par mark ds %u", data_structure_instance->id());
@@ -113,7 +120,6 @@ inline bool G1ConcurrentMark::mark_in_bitmap(uint const worker_id, oop const obj
     return success;
   }
 
-  G1DataStructureRegionSet* data_structure_instance = hr->data_structure();
   if(data_structure_instance != nullptr) {
     // log_info(gc)("set data structure alive %u", data_structure_instance->id());
     // log_info(gc)("par mark ds %u", data_structure_instance->id());
@@ -209,12 +215,16 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
     if (task_entry.is_array_slice()) {
       _words_scanned += _objArray_processor.process_slice(task_entry.slice());
     } else if (task_entry.is_data_structure_instance()){
-//      if(_cm->should_do_detailed_concurrent_gc()){
-//        ShouldNotReachHere();
-//      }
+
       G1DataStructureRegionSet* data_structure_instance = task_entry.data_structure_instance();
+      if(data_structure_instance->should_mark_detailed()){
+        ShouldNotReachHere();
+      }
       // log_info(gc)("handle data structure instance %u", data_structure_instance->id());
       data_structure_instance->scan_out_instances([&](G1DataStructureRegionSet* out_instance){
+        if(out_instance->should_mark_detailed()){
+          ShouldNotReachHere();
+        }
         if (out_instance->set_alive_par()) {
           log_info(gc)("set alive par whole out");
           if (_data_structure_to_mark_stack && !_cm->should_do_detailed_concurrent_gc()){
@@ -338,7 +348,9 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
   // be pushed on the stack. So, some duplicate work, but no
   // correctness problems.
   // if (is_below_finger(obj, global_finger)) {
-  if (is_below_finger(obj, global_finger) && (_cm->should_do_detailed_concurrent_gc() || data_structure_instance == nullptr)) {
+  if (is_below_finger(obj, global_finger) && (_cm->should_do_detailed_concurrent_gc() 
+        || data_structure_instance == nullptr 
+        || data_structure_instance->should_mark_detailed())) {
 
     G1TaskQueueEntry entry = G1TaskQueueEntry::from_oop(obj);
     if (obj->is_typeArray()) {
@@ -357,7 +369,10 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
       push(entry);
     }
   // }
-  } else if (data_structure_instance != nullptr && _data_structure_to_mark_stack && !_cm->should_do_detailed_concurrent_gc()){
+  } else if (data_structure_instance != nullptr 
+    && _data_structure_to_mark_stack 
+    && !_cm->should_do_detailed_concurrent_gc()
+    && !data_structure_instance->should_mark_detailed()) {
   // if (data_structure_instance != nullptr && _data_structure_to_mark_stack){
     //hua: todo
     // log_info(gc)("make grey: push data structure %u", data_structure_instance->id());
