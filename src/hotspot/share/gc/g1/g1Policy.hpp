@@ -448,6 +448,13 @@ public:
   void print_age_table();
 
   void update_survivors_policy();
+
+private:
+  size_t _last_free;
+  size_t _temp_last_free;
+
+public:
+  void note_finish_conc();
 };
 
 #endif // SHARE_GC_G1_G1POLICY_HPP

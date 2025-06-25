@@ -203,6 +203,23 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
 //     _data_structure_types.add(data_structure);
 // }
 
+
+
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+
+//     // [Lorg/apache/spark/graphx/Edge; -> org/apache/spark/graphx/Edge$mcI$sp
+
+//     Symbol* l_edge = SymbolTable::new_symbol("[Lorg/apache/spark/graphx/Edge;");
+//     Symbol* edge = SymbolTable::new_symbol("org/apache/spark/graphx/Edge$mcI$sp");
+
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(l_edge);
+//     data_structure->add_edge(l_edge, edge);
+
+//     _data_structure_types.add(data_structure);
+    
+// }
+
 void G1DataStructureManager::initialize_predefined_data_structures() {
 
     // scala/Tuple3 -> [D: 37.45%

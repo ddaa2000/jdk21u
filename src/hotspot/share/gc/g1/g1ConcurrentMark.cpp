@@ -600,7 +600,7 @@ private:
       // live_words data are current wrt to the _mark_bitmap. We use this information
       // to only clear ranges of the bitmap that require clearing.
       if (is_clear_concurrent_undo()) {
-        log_info(gc)("in undo mark");
+        // log_info(gc)("in undo mark");
         // No need to clear bitmaps for empty regions (which includes regions we
         // did not mark through).
         if (!_cm->contains_live_object(r->hrm_index())) {
@@ -1311,26 +1311,32 @@ void G1ConcurrentMark::remark() {
   }
 
   if(!should_do_detailed_concurrent_gc()){
-//    log_info(gc)("before build reverse remset");
+   log_info(gc)("before build reverse remset");
     BuildReverseRemsetClosure cl(_g1h);
     _g1h->heap_region_iterate(&cl);
-//    log_info(gc)("after build reverse remset");
+   log_info(gc)("after build reverse remset");
   }
 
   
 
   {
     GCTraceTime(Debug, gc, phases) debug("Finalize Marking", _gc_timer_cm);
+    log_info(gc)("before finalize marking");
     finalize_marking();
+    log_info(gc)("after finalize marking");
   }
 
   if(!should_do_detailed_concurrent_gc()){
+    log_info(gc)("update live");
     UpdateDataStructureLiveSize cl;
     _g1h->heap_region_iterate(&cl);
+    log_info(gc)("after update live");
   }
 
   if(!should_do_detailed_concurrent_gc()){
+    log_info(gc)("before finalize data structure marking");
     finalize_data_structure_marking();
+    log_info(gc)("after finalize data structure marking");
   }
 
   double mark_work_end = os::elapsedTime();
@@ -1377,11 +1383,15 @@ void G1ConcurrentMark::remark() {
     }
     {
       GCTraceTime(Debug, gc, phases) debug("Reclaim Empty Regions", _gc_timer_cm);
+      log_info(gc)("before reclaim empty regions");
       reclaim_empty_regions();
+      log_info(gc)("after reclaim empty regions");
     }
 
      if(!should_do_detailed_concurrent_gc()){
+      log_info(gc)("before remove dead");
        _g1h->data_structure_manager()->remove_dead_instances();
+       log_info(gc)("after remove dead");
      }
 
     // Clean out dead classes
@@ -2050,6 +2060,7 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
 
   {
     StrongRootsScope srs(active_workers);
+    log_info(gc)("before push live");
 
 
     G1CMPushLiveDataStructureTask pushTask(this, active_workers);
@@ -2059,11 +2070,12 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
     // immediately.
     _g1h->workers()->run_task(&pushTask);
     // _g1h->workers()->run_task(&remarkTask);
+    log_info(gc)("after push live");
   }
 
   {
     StrongRootsScope srs(active_workers);
-
+    log_info(gc)("before remark live");
 
     // G1CMPushLiveDataStructureTask pushTask(this, active_workers);
     G1CMRemarkDataStructureTask remarkTask(this, active_workers);
@@ -2072,6 +2084,7 @@ void G1ConcurrentMark::finalize_data_structure_marking() {
     // immediately.
     // _g1h->workers()->run_task(&pushTask);
     _g1h->workers()->run_task(&remarkTask);
+    log_info(gc)("after remark live");
   }
 
   SATBMarkQueueSet& satb_mq_set = G1BarrierSet::satb_mark_queue_set();
@@ -3356,9 +3369,20 @@ bool BuildReverseRemsetClosure::do_heap_region(HeapRegion* r){
   // _g1h->rem_set()->prepare_region_for_scan(r);
   r->prepare_remset_for_scan();
   BuildRegionReverseRemsetClosure cl(_g1h, this, _ds_manager, _g1h->card_table(), r);
+  // BuildEmptyClosure empty_cl;
   // memset((void*)_incoming_regions, 0, sizeof(bool)*_num_regions);
   // has_incoming = false;
+  // log_info(gc)("before empty");
+  // r->rem_set()->iterate_cards_safepoint(empty_cl);
+  // log_info(gc)("after empty");
+
+
+  r->prepare_remset_for_scan();
+  // log_info(gc)("before real iter");
   r->rem_set()->iterate_cards_safepoint(cl);
+  // log_info(gc)("after real iter");
+
+
   // if(has_incoming){
   //   _ls.print("into Region %u", r->hrm_index());
   //   _ls.print_cr("");
@@ -3378,16 +3402,19 @@ bool BuildReverseRemsetClosure::do_heap_region(HeapRegion* r){
 // }
 
 void BuildRegionReverseRemsetClosure::do_card(uint region_idx, uint card_idx){
+  // log_info(gc)("do card in");
   HeapRegion* region = _g1h->region_at(region_idx);
   G1DataStructureRegionSet* data_structure_instance = region->data_structure();
 
   if(data_structure_instance == nullptr){
     // only track remset from data structure instances
+    // log_info(gc)("do card out");
     return;
   }
 
   if(_to_region->data_structure() == data_structure_instance){
     // two regions belong to the same data structure instance, no need to track inner remset
+    // log_info(gc)("do card out");
     return;
   }
 
@@ -3414,6 +3441,8 @@ void BuildRegionReverseRemsetClosure::do_card(uint region_idx, uint card_idx){
   } else {
     data_structure_instance->add_out_card(cv);
   }
+  // log_info(gc)("do card out");
+
 
   // _cl->do_incoming_region(region_idx);
 }

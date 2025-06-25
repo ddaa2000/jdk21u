@@ -961,6 +961,12 @@ public:
   virtual void do_card(uint region_idx, uint card_idx);
 };
 
+class BuildEmptyClosure : public G1CardSet::CardClosure{
+  virtual void do_card(uint region_idx, uint card_idx) {
+    // Do nothing, just used to clear the card set.
+  }
+};
+
 class BuildReverseRemsetClosure : public HeapRegionClosure {
   G1CollectedHeap* _g1h;
   G1DataStructureManager* _ds_manager;

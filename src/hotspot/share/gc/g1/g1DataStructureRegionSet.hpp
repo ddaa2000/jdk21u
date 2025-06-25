@@ -93,6 +93,7 @@ private:
     static int compare(G1CardTable::CardValue* const& left, G1CardTable::CardValue* const& right){
         return (uintptr_t)left - (uintptr_t)right;
     }
+    G1CardTable* _card_table;
     LinkedListImpl<HeapRegion*> _regions;
     SortedLinkedList<G1CardTable::CardValue*, compare> _out_cards;
     SortedLinkedList<G1CardTable::CardValue*, compare> _out_cards_data;
@@ -168,9 +169,7 @@ public:
         _out_instances.clear();
     }
 
-    void add_out_card(G1CardTable::CardValue* card) {
-        _out_cards.add(card);
-    }
+    void add_out_card(G1CardTable::CardValue* card);
 
     void add_out_card_data(G1CardTable::CardValue* card) {
         _out_cards_data.add(card);

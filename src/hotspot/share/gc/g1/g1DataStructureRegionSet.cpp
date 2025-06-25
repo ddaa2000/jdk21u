@@ -5,6 +5,8 @@
 #include "gc/g1/g1AllocRegion.inline.hpp"
 #include "gc/g1/g1ConcurrentMarkBitMap.hpp"
 #include "gc/g1/g1ConcurrentMarkBitMap.inline.hpp"
+#include "gc/g1/g1CardTable.hpp"
+#include "gc/g1/g1CardTable.inline.hpp"
 
 
 
@@ -96,6 +98,7 @@ void G1DataStructure::add_edge(Symbol* from, Symbol* to) {
 
 
 G1DataStructureRegionSet::G1DataStructureRegionSet(G1CollectedHeap* heap, G1DataStructure* data_structure, uint id) :
+    _card_table(heap->card_table()),
     _regions(),
     _out_cards(),
     _data_structure(data_structure),
@@ -219,4 +222,9 @@ void G1DataStructureRegionSet::find_out_card(HeapWord* addr){
         p = p->next();
     }
     log_info(gc)("not found for %p", addr);
+}
+
+void G1DataStructureRegionSet::add_out_card(G1CardTable::CardValue* card) {
+    _card_table->mark_clean_as_dirty(card);
+    // _out_cards.add(card);
 }

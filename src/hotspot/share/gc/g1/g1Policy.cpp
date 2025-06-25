@@ -81,7 +81,9 @@ G1Policy::G1Policy(STWGCTimer* gc_timer) :
   _mark_cleanup_start_sec(0),
   _tenuring_threshold(MaxTenuringThreshold),
   _max_survivor_regions(0),
-  _survivors_age_table(true)
+  _survivors_age_table(true),
+  _last_free(0),
+  _temp_last_free(0)
 {
 }
 
@@ -722,6 +724,20 @@ bool G1Policy::need_to_start_conc_mark(const char* source, size_t alloc_word_siz
                               result ? "Request concurrent cycle initiation (occupancy higher than threshold)" : "Do not request concurrent cycle initiation (still doing mixed collections)",
                               cur_used_bytes, alloc_byte_size, marking_initiating_used_threshold, (double) marking_initiating_used_threshold / _g1h->capacity() * 100, source);
   }
+
+  // static size_t last_free_regions = _g1h->max_regions();
+  if(_last_free == 0) {
+    log_info(gc)("last free 0");
+    _last_free = _g1h->max_regions();
+  }
+  if(result){
+    if(_g1h->num_free_regions() >= (double)_last_free - _g1h->max_regions() * 0.1) {
+      log_info(gc)("cancel concurrent due to little heap change");
+      return false;
+    }
+    log_info(gc)("big change, last free: %lu, present %u", _last_free, _g1h->num_free_regions());
+    _temp_last_free = _g1h->num_free_regions();
+  }
   // x += 1;
   // // log_info(gc)("region free: %u, region max: %u", _g1h->num_free_regions(), _g1h->max_regions());
   // // if(x > 4 || _g1h->capacity() * 0.8 < _g1h->used_unlocked() || _g1h->num_free_regions() <_g1h->max_regions() * G1DetailedRatio){
@@ -732,6 +748,11 @@ bool G1Policy::need_to_start_conc_mark(const char* source, size_t alloc_word_siz
   //   return false;
   // }
   return result;
+}
+
+void G1Policy::note_finish_conc(){
+  log_info(gc)("last free to %lu", _temp_last_free);
+  _last_free = _temp_last_free;
 }
 
 bool G1Policy::concurrent_operation_is_full_mark(const char* msg) {
