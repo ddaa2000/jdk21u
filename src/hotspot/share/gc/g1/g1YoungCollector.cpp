@@ -1113,6 +1113,10 @@ void G1YoungCollector::collect() {
     //   _g1h->data_structure_manager()->verify_all();
     // }
 
+    if (_g1h->collector_state()->in_concurrent_start_gc()){
+      _g1h->policy()->note_finish_mark_start();
+    }
+
     policy()->record_young_collection_end(_concurrent_operation_is_full_mark, evacuation_failed());
   }
 
@@ -1124,7 +1128,6 @@ void G1YoungCollector::collect() {
     // _g1h->rem_set()->log_remset();
     // _g1h->print_region_types();
   }
-
   // {
 
   //   uint active_workers = _g1h->workers()->active_workers();

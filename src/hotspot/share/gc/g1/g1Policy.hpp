@@ -455,6 +455,7 @@ private:
 
 public:
   void note_finish_conc();
+  void note_finish_mark_start();
 };
 
 #endif // SHARE_GC_G1_G1POLICY_HPP

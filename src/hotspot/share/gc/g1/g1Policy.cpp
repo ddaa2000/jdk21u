@@ -730,13 +730,21 @@ bool G1Policy::need_to_start_conc_mark(const char* source, size_t alloc_word_siz
     log_info(gc)("last free 0");
     _last_free = _g1h->max_regions();
   }
+
+  
   if(result){
-    if(_g1h->num_free_regions() >= (double)_last_free - _g1h->max_regions() * 0.1) {
+    size_t available_free = _g1h->num_free_regions() + _g1h->eden_regions_count();
+    if(_last_free < available_free){
+      _last_free = available_free;
+    }
+    log_info(gc)("last free %lu, temp free %lu, present free %lu",
+                 _last_free, _temp_last_free, available_free);
+    if(available_free >= (double)_last_free - available_free * 0.1) {
       log_info(gc)("cancel concurrent due to little heap change");
       return false;
     }
-    log_info(gc)("big change, last free: %lu, present %u", _last_free, _g1h->num_free_regions());
-    _temp_last_free = _g1h->num_free_regions();
+    // log_info(gc)("big change, last free: %lu, present %u", _last_free, _g1h->num_free_regions());
+    // _temp_last_free = _g1h->num_free_regions();
   }
   // x += 1;
   // // log_info(gc)("region free: %u, region max: %u", _g1h->num_free_regions(), _g1h->max_regions());
@@ -748,6 +756,13 @@ bool G1Policy::need_to_start_conc_mark(const char* source, size_t alloc_word_siz
   //   return false;
   // }
   return result;
+}
+
+
+void G1Policy::note_finish_mark_start(){
+  size_t available_free = _g1h->num_free_regions() + _g1h->eden_regions_count();
+  log_info(gc)("big change, last free: %lu, present %lu", _last_free, available_free);
+  _temp_last_free = available_free;
 }
 
 void G1Policy::note_finish_conc(){
