@@ -739,10 +739,11 @@ bool G1Policy::need_to_start_conc_mark(const char* source, size_t alloc_word_siz
     }
     log_info(gc)("last free %lu, temp free %lu, present free %lu",
                  _last_free, _temp_last_free, available_free);
-    if(available_free >= (double)_last_free - available_free * 0.1) {
+    if(available_free >= (double)_last_free - available_free * 0.35) {
       log_info(gc)("cancel concurrent due to little heap change");
       return false;
     }
+    log_info(gc)("need to start due to big change, last free: %lu, present %lu", _last_free, available_free);
     // log_info(gc)("big change, last free: %lu, present %u", _last_free, _g1h->num_free_regions());
     // _temp_last_free = _g1h->num_free_regions();
   }

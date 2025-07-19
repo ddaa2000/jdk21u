@@ -976,7 +976,7 @@ void G1ConcurrentMark::scan_root_regions() {
 
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
-    // _g1h->print_region_types();
+    _g1h->print_region_types();
   }
 
   if (root_regions()->scan_in_progress()) {
@@ -2238,6 +2238,8 @@ void G1ConcurrentMark::rebuild_and_scrub() {
   }
 
   G1ConcurrentRebuildAndScrub::rebuild_and_scrub(this, needs_remembered_set_rebuild(), _concurrent_workers);
+  // G1ConcurrentRebuildAndScrub::rebuild_and_scrub(this, false, _concurrent_workers);
+
 }
 
 void G1ConcurrentMark::print_stats() {

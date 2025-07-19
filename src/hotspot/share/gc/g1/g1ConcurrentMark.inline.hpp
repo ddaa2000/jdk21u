@@ -210,7 +210,7 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       // log_info(gc)("handle data structure instance %u", data_structure_instance->id());
       data_structure_instance->scan_out_instances([&](G1DataStructureRegionSet* out_instance){
         if (out_instance->set_alive_par()) {
-          log_info(gc)("set alive par whole out");
+          // log_info(gc)("set alive par whole out");
           if (_data_structure_to_mark_stack && !_cm->should_do_detailed_concurrent_gc()){
             G1TaskQueueEntry entry = G1TaskQueueEntry::from_data_structure_instance(out_instance);
             push(entry);
@@ -229,7 +229,7 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
         HeapWord* scan_end = MIN2(card_end, hr->top());
         if(card_start < scan_end){
           MemRegion mr(card_start, MIN2(scan_end, hr->top()));
-          // log_info(gc)("scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
+          log_info(gc)("scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
           process_data_structure_out_cards(hr->hrm_index(), mr);
         }
       });
