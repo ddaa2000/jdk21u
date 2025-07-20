@@ -427,9 +427,9 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
                                                            node_index,
                                                            data_structure);
     if (obj_ptr == nullptr) {
-      if(data_structure == nullptr){
-        data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-      }
+      // if(data_structure == nullptr){
+      //   data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+      // }
       obj_ptr = allocate_in_next_plab(dest_attr,
                                       word_sz,
                                       plab_refill_failed,
@@ -492,9 +492,10 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
   G1DataStructureRegionSet* target_data_structure = nullptr;
-  if(dest_attr.is_old()){
-    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-  }
+  // if(dest_attr.is_old()){
+  //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  // }
+
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){
   //     log_info(gc)("found data structure obj %s -> %s", from_obj->klass()->name()->as_C_string(), old->klass()->name()->as_C_string());
@@ -502,6 +503,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   //     log_info(gc)("found data structure obj root -> %s", old->klass()->name()->as_C_string());
   //   }
   // }
+
   HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index, target_data_structure);
 
 
@@ -560,31 +562,9 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
       }
       _age_table.add(age, word_sz);
     } else {
-      // log_info(gc)("p is %p", p);
-      // log_info(gc)("p is %p", _g1h->heap_region_containing_or_null((void*)p));
-
-      // if(
-      //   _g1h->is_in_reserved((void*)p) &&
-      //   _g1h->heap_region_containing_or_null((void*)p) != nullptr 
-      //   && _g1h->block_is_obj((HeapWord*)p)
-      // ){
-      //   HeapRegion* r = _g1h->heap_region_containing(p);
-      //   HeapWord* const pb = r->parsable_bottom_acquire();
-      //   if ( r->obj_in_parsable_area((HeapWord*)p, pb)) {
-      //     HeapWord* const start_address = 
-      //       r->is_humongous() ?
-      //       r->humongous_start_region()->bottom() :
-      //       r->block_start(p, pb);
-      //   }
+      // if(from_obj != nullptr && from_obj->klass() != nullptr){
+      //   reference_hash_map()->add_or_inc(from_obj->klass()->name(), obj->klass()->name(), 1, obj->size());
       // }
-
-      // _g1h->reference_dictionary()->add_klass(Thread::current(), cast_to_oop(start_address)->klass(), klass);
-      // _g1h->reference_dictionary()->add_klass(Thread::current(), klass, klass);
-      if(from_obj != nullptr && from_obj->klass() != nullptr){
-      // if (_from_klass_name != nullptr) {
-        // _par_scan_state->reference_hash_map()->add_or_inc(_from_klass_name, obj->klass()->name(), 1, obj->size());
-        reference_hash_map()->add_or_inc(from_obj->klass()->name(), obj->klass()->name(), 1, obj->size());
-      }
       update_bot_after_copying(obj, word_sz);
     }
 
