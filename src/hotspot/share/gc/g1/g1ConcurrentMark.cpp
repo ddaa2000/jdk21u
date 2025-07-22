@@ -1263,6 +1263,8 @@ public:
 };
 
 void G1ConcurrentMark::remark() {
+  GCMajfltStats gc_majflt_stats;
+  gc_majflt_stats.start();
   // assert_at_safepoint_on_vm_thread();
 
   // If a full collection has happened, we should not continue. However we might
@@ -1326,6 +1328,9 @@ void G1ConcurrentMark::remark() {
     log_info(gc)("after finalize marking");
   }
 
+  gc_majflt_stats.end_and_log("finalize marking and before");
+
+
   if(!should_do_detailed_concurrent_gc()){
     log_info(gc)("update live");
     UpdateDataStructureLiveSize cl;
@@ -1333,11 +1338,20 @@ void G1ConcurrentMark::remark() {
     log_info(gc)("after update live");
   }
 
+  gc_majflt_stats.start();
+
+
   if(!should_do_detailed_concurrent_gc()){
     log_info(gc)("before finalize data structure marking");
     finalize_data_structure_marking();
     log_info(gc)("after finalize data structure marking");
   }
+
+  gc_majflt_stats.end_and_log("finalize ds");
+
+  gc_majflt_stats.start();
+
+
 
   double mark_work_end = os::elapsedTime();
 
@@ -1439,6 +1453,10 @@ void G1ConcurrentMark::remark() {
   //   _g1h->data_structure_manager()->clear_all_out_cards();
   // }
   // Statistics
+
+  gc_majflt_stats.end_and_log("all after finalize ds");
+
+
   double now = os::elapsedTime();
   _remark_mark_times.add((mark_work_end - start) * 1000.0);
   _remark_weak_ref_times.add((now - mark_work_end) * 1000.0);

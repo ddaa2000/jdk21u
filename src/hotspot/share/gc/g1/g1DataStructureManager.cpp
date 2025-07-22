@@ -221,20 +221,20 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
 // }
 
 void G1DataStructureManager::initialize_predefined_data_structures() {
-    // Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
-    // Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
-    // Symbol* l_d = SymbolTable::new_symbol("[D");
-    // Symbol* l_i = SymbolTable::new_symbol("[I");
-    // Symbol* d = SymbolTable::new_symbol("java/lang/Double");
+    Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
+    Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
+    Symbol* l_d = SymbolTable::new_symbol("[D");
+    Symbol* l_i = SymbolTable::new_symbol("[I");
+    Symbol* d = SymbolTable::new_symbol("java/lang/Double");
 
-    // G1DataStructure* data_structure = new G1DataStructure();
-    // data_structure->add_root(l_tuple3);
-    // data_structure->add_edge(l_tuple3, tuple3);
-    // data_structure->add_edge(tuple3, l_d);
-    // data_structure->add_edge(tuple3, l_i);
-    // data_structure->add_edge(tuple3, d);
+    G1DataStructure* data_structure = new G1DataStructure();
+    data_structure->add_root(l_tuple3);
+    data_structure->add_edge(l_tuple3, tuple3);
+    data_structure->add_edge(tuple3, l_d);
+    data_structure->add_edge(tuple3, l_i);
+    data_structure->add_edge(tuple3, d);
 
-    // _data_structure_types.add(data_structure);
+    _data_structure_types.add(data_structure);
     
 }
 
@@ -280,7 +280,7 @@ void G1DataStructureManager::initialize_predefined_data_structures() {
 
 DataPLABMap* G1DataStructureManager::create_and_initialize_plab_map(uint num_alloc_buffers, size_t desired_plab_size, size_t tolerated_refills){
     MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
-    DataPLABMap* plab_map = new DataPLABMap();
+    DataPLABMap* plab_map = new DataPLABMap(10);
     LinkedListNode<G1DataStructureRegionSet*>* p = _data_structures.head();
     while (p != nullptr) {
         G1DataStructureRegionSet* data_structure = *p->data();

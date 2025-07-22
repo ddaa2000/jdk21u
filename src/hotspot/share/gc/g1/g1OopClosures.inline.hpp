@@ -231,7 +231,12 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
 
   // rebuild_remset(p);
 
-  _cm_task->deal_with_reference(p);
+  HeapRegion* hr = _g1h->heap_region_containing(p);
+  G1DataStructureRegionSet* data_structure_instance = hr->data_structure();
+  if(data_structure_instance == nullptr) {
+    ShouldNotReachHere();
+  }
+  _cm_task->deal_with_reference_ds(p, data_structure_instance);
   // static uint x = 0;
   // T o = RawAccess<>::oop_load(p);
   // if (CompressedOops::is_null(o)) {

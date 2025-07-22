@@ -855,6 +855,10 @@ public:
   template <class T>
   inline bool deal_with_reference(T* p);
 
+  template <class T>
+  inline bool deal_with_reference_ds(T* p, G1DataStructureRegionSet* from_ds);
+
+
   // Scans an object and visits its children.
   inline void scan_task_entry(G1TaskQueueEntry task_entry);
 

@@ -371,6 +371,26 @@ inline bool G1CMTask::deal_with_reference(T* p) {
   return make_reference_grey(obj);
 }
 
+template <class T>
+inline bool G1CMTask::deal_with_reference_ds(T* p, G1DataStructureRegionSet* from_ds) {
+  increment_refs_reached();
+  oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
+  if (obj == nullptr) {
+    return false;
+  }
+  // HeapRegion* const hr = _g1h->heap_region_containing(obj);
+  // G1DataStructureRegionSet* ds = hr->data_structure();
+
+  // if(ds != from_ds){
+  //   if(ds == nullptr) {
+  //     log_info(gc)("out obj, klass %s", obj->klass()->name()->as_C_string());
+  //   } else {
+  //     log_info(gc)("out ds obj, klass %s", obj->klass()->name()->as_C_string());
+  //   }
+  // }
+  return make_reference_grey(obj);
+}
+
 inline void G1ConcurrentMark::raw_mark_in_bitmap(oop obj) {
   HeapRegion* const hr = _g1h->heap_region_containing(obj);
   _mark_bitmap.par_mark(obj);

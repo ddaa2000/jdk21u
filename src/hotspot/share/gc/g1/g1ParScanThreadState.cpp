@@ -94,7 +94,7 @@ G1ParScanThreadState::G1ParScanThreadState(G1CollectedHeap* g1h,
     _preserved_marks(preserved_marks),
     _evacuation_failed_info(),
     _evac_failure_regions(evac_failure_regions),
-    _reference_hash_map(16)
+    _reference_hash_map(10)
 {
   // We allocate number of young gen regions in the collection set plus one
   // entries, since entry 0 keeps track of surviving bytes for non-young regions.
@@ -427,9 +427,9 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
                                                            node_index,
                                                            data_structure);
     if (obj_ptr == nullptr) {
-      // if(data_structure == nullptr){
-      //   data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-      // }
+      if(data_structure == nullptr){
+        data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+      }
       obj_ptr = allocate_in_next_plab(dest_attr,
                                       word_sz,
                                       plab_refill_failed,
@@ -486,15 +486,36 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   const size_t word_sz = old->size_given_klass(klass);
 
   uint age = 0;
-  G1HeapRegionAttr dest_attr = next_region_attr(region_attr, old_mark, age);
+  // G1HeapRegionAttr dest_attr = next_region_attr(region_attr, old_mark, age);
+
+  HeapRegion* from_obj_region = nullptr;
+  G1HeapRegionAttr dest_attr;
+  if(from_obj != nullptr){
+    from_obj_region = _g1h->heap_region_containing_or_null(from_obj);
+  }
+
+  // if(from_obj_region != nullptr) {
+  // if(from_obj_region != nullptr && from_obj_region->is_young()) {
+  // }
+  if(from_obj_region != nullptr && from_obj_region->is_young()) {
+    dest_attr = region_attr;
+  } else {
+    dest_attr = next_region_attr(region_attr, old_mark, age);
+  }
+  // dest_attr = next_region_attr(region_attr, old_mark, age);
+
+
   HeapRegion* const from_region = _g1h->heap_region_containing(old);
   uint node_index = from_region->node_index();
 
+
+
+
   // HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
   G1DataStructureRegionSet* target_data_structure = nullptr;
-  // if(dest_attr.is_old()){
-  //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-  // }
+  if(dest_attr.is_old()){
+    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  }
 
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){
@@ -562,9 +583,9 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
       }
       _age_table.add(age, word_sz);
     } else {
-      // if(from_obj != nullptr && from_obj->klass() != nullptr){
-      //   reference_hash_map()->add_or_inc(from_obj->klass()->name(), obj->klass()->name(), 1, obj->size());
-      // }
+      if(from_obj != nullptr && from_obj->klass() != nullptr){
+        reference_hash_map()->add_or_inc(from_obj->klass()->name(), obj->klass()->name(), 1, obj->size());
+      }
       update_bot_after_copying(obj, word_sz);
     }
 
