@@ -497,6 +497,19 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // if(from_obj_region != nullptr) {
   // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   // }
+
+  // G1DataStructureRegionSet* target_data_structure = nullptr;
+  // target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+
+  // if(target_data_structure != nullptr){
+  //   dest_attr = G1HeapRegionAttr::Old;
+  // } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
+  //   dest_attr = region_attr;
+  // } else {
+  //   dest_attr = next_region_attr(region_attr, old_mark, age);
+  // }
+
+
   if(from_obj_region != nullptr && from_obj_region->is_young()) {
     dest_attr = region_attr;
   } else {
@@ -512,6 +525,8 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
 
   // HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
+
+  
   G1DataStructureRegionSet* target_data_structure = nullptr;
   if(dest_attr.is_old()){
     target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);

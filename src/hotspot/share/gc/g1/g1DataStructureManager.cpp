@@ -29,22 +29,7 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
     Symbol* to_symbol = to_oop->klass()->name();
     G1DataStructureRegionSet* data_structure = nullptr;
-    G1DataStructure* data_structure_type = get_data_structure_by_root(to_symbol);
-    if (data_structure_type != nullptr) {
-        MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
-        data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
-        if(_allocator == nullptr || _evacuation_info == nullptr) {
-            ShouldNotReachHere();
-        }
-
-        {
-            log_info(gc)("create data structure for obj %p, class %s, at %p, id %u", to_oop, to_symbol->as_C_string(), data_structure, _present_id);
-            data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
-            _data_structures.add(data_structure);
-            _present_id++;
-        }
-        return data_structure;
-    }
+    G1DataStructure* data_structure_type = nullptr;
 
     if (from_oop != nullptr) {
         Symbol* from_symbol = from_oop->klass()->name();
@@ -108,6 +93,24 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
         // }
     }
 
+    data_structure_type = get_data_structure_by_root(to_symbol);
+    if (data_structure_type != nullptr) {
+        MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+        data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
+        if(_allocator == nullptr || _evacuation_info == nullptr) {
+            ShouldNotReachHere();
+        }
+
+        {
+            log_info(gc)("create normal data structure for obj %p, class %s, at %p, id %u, from class %s", to_oop, to_symbol->as_C_string(), data_structure, _present_id,
+                         from_oop != nullptr ? from_oop->klass()->name()->as_C_string() : "null");
+            data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
+            _data_structures.add(data_structure);
+            _present_id++;
+        }
+        return data_structure;
+    }
+
     return nullptr;
 }
 
@@ -168,24 +171,24 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
     return false;
 }
 
-// void G1DataStructureManager::initialize_predefined_data_structures() {
-//     Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
-//     Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
-//     Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
-//     Symbol* s3 = SymbolTable::new_symbol("[I");
+void G1DataStructureManager::initialize_predefined_data_structures() {
+    // Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
+    // Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
+    // Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
+    // Symbol* s3 = SymbolTable::new_symbol("[I");
 
-//     G1DataStructure* data_structure = new G1DataStructure();
-//     data_structure->add_root(s1);
-//     // data_structure->add_root(s2);
+    // G1DataStructure* data_structure = new G1DataStructure();
+    // data_structure->add_root(s1);
+    // // data_structure->add_root(s2);
 
-//     data_structure->add_edge(s1, s2);
-//     data_structure->add_edge(s2, s3);
-//     data_structure->add_edge(s2, ChiPointer);
+    // data_structure->add_edge(s1, s2);
+    // data_structure->add_edge(s2, s3);
+    // data_structure->add_edge(s2, ChiPointer);
 
-//     // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
-//     // _data_structures.add(data_structure_region_set);
-//     _data_structure_types.add(data_structure);
-// }
+    // // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
+    // // _data_structures.add(data_structure_region_set);
+    // _data_structure_types.add(data_structure);
+}
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
 //     Symbol* payload = SymbolTable::new_symbol("org/example/gctest/DataStructureTest$MyPayload");
@@ -220,23 +223,34 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
     
 // }
 
-void G1DataStructureManager::initialize_predefined_data_structures() {
-    Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
-    Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
-    Symbol* l_d = SymbolTable::new_symbol("[D");
-    Symbol* l_i = SymbolTable::new_symbol("[I");
-    Symbol* d = SymbolTable::new_symbol("java/lang/Double");
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     Symbol* tree_node = SymbolTable::new_symbol("smile/clustering/BBDTree$Node");
+//     Symbol* l_d = SymbolTable::new_symbol("[D");
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(tree_node);
+//     data_structure->add_edge(tree_node, tree_node);
+//     data_structure->add_edge(tree_node, l_d);
 
-    G1DataStructure* data_structure = new G1DataStructure();
-    data_structure->add_root(l_tuple3);
-    data_structure->add_edge(l_tuple3, tuple3);
-    data_structure->add_edge(tuple3, l_d);
-    data_structure->add_edge(tuple3, l_i);
-    data_structure->add_edge(tuple3, d);
+//     _data_structure_types.add(data_structure);
+// }
 
-    _data_structure_types.add(data_structure);
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     // Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
+//     // Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
+//     // Symbol* l_d = SymbolTable::new_symbol("[D");
+//     // Symbol* l_i = SymbolTable::new_symbol("[I");
+//     // Symbol* d = SymbolTable::new_symbol("java/lang/Double");
+
+//     // G1DataStructure* data_structure = new G1DataStructure();
+//     // data_structure->add_root(l_tuple3);
+//     // data_structure->add_edge(l_tuple3, tuple3);
+//     // data_structure->add_edge(tuple3, l_d);
+//     // data_structure->add_edge(tuple3, l_i);
+//     // data_structure->add_edge(tuple3, d);
+
+//     // _data_structure_types.add(data_structure);
     
-}
+// }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
 
