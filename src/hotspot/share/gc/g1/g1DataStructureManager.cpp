@@ -172,23 +172,59 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
 }
 
 void G1DataStructureManager::initialize_predefined_data_structures() {
-    // Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
-    // Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
-    // Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
-    // Symbol* s3 = SymbolTable::new_symbol("[I");
+    // // java/nio/HeapByteBuffer -> [B : weight_factor: 99.05% size_factor: 0.9904943866047917 weight: 192886274471, count: 23383061
+    // // org/apache/hadoop/hbase/nio/SingleByteBuff -> java/nio/HeapByteBuffer : weight_factor: 99.95% size_factor: 0.989986457320577 weight: 187188064, count: 23398508
+    // // org/apache/hadoop/hbase/io/hfile/ExclusiveMemHFileBlock -> org/apache/hadoop/hbase/nio/SingleByteBuff : weight_factor: 99.59% size_factor: 0.9859389914678521 weight: 139936068, count: 23322678
+    // // org/apache/hadoop/hbase/io/hfile/LruCachedBlock -> org/apache/hadoop/hbase/io/hfile/ExclusiveMemHFileBlock : weight_factor: 100.00% size_factor: 0.9858907560111589 weight: 233210470, count: 23321047
+    // // java/util/concurrent/ConcurrentHashMap$Node -> org/apache/hadoop/hbase/io/hfile/LruCachedBlock : weight_factor: 98.88% size_factor: 0.9748735317195553 weight: 184479800, count: 23059975
+    // // [Ljava/util/concurrent/ConcurrentHashMap$Node; -> java/util/concurrent/ConcurrentHashMap$Node : weight_factor: 71.43% size_factor: 0.6963393706280268 weight: 83359275, count: 16671855
+    // // java/util/concurrent/ConcurrentHashMap$Node -> java/util/concurrent/ConcurrentHashMap$Node : weight_factor: 28.57% size_factor: 0.2785339940220882 weight: 33343500, count: 6668700
+    // // java/util/concurrent/ConcurrentHashMap -> [Ljava/util/concurrent/ConcurrentHashMap$Node; : weight_factor: 99.38% size_factor: 0.6919891642651064 weight: 587288, count: 4797
+    // Symbol* conc_hash_map_node_array = SymbolTable::new_symbol("[Ljava/util/concurrent/ConcurrentHashMap$Node;");
+    // Symbol* conc_hash_map_node = SymbolTable::new_symbol("java/util/concurrent/ConcurrentHashMap$Node");
+    // Symbol* lrucached_block = SymbolTable::new_symbol("org/apache/hadoop/hbase/io/hfile/LruCachedBlock");
+    // Symbol* exclusive_mem_hfile_block = SymbolTable::new_symbol("org/apache/hadoop/hbase/io/hfile/ExclusiveMemHFileBlock");
+    // Symbol* hf_ctx = SymbolTable::new_symbol("org/apache/hadoop/hbase/io/hfile/HFileContext");
+    // Symbol* single_byte_buff = SymbolTable::new_symbol("org/apache/hadoop/hbase/nio/SingleByteBuff");
+    // Symbol* heap_byte_buffer = SymbolTable::new_symbol("java/nio/HeapByteBuffer");
+    // Symbol* byte_array = SymbolTable::new_symbol("[B");
+
+    // // org/apache/hadoop/hbase/nio/RefCnt
+    // Symbol* ref_cnt = SymbolTable::new_symbol("org/apache/hadoop/hbase/nio/RefCnt");
 
     // G1DataStructure* data_structure = new G1DataStructure();
-    // data_structure->add_root(s1);
-    // // data_structure->add_root(s2);
+    // data_structure->add_root(conc_hash_map_node_array);
+    // data_structure->add_edge(conc_hash_map_node_array, conc_hash_map_node);
+    // data_structure->add_edge(conc_hash_map_node, conc_hash_map_node);
+    // data_structure->add_edge(conc_hash_map_node, lrucached_block);
+    // data_structure->add_edge(lrucached_block, exclusive_mem_hfile_block);
+    // data_structure->add_edge(exclusive_mem_hfile_block, single_byte_buff);
+    // data_structure->add_edge(exclusive_mem_hfile_block, hf_ctx);
+    // data_structure->add_edge(single_byte_buff, heap_byte_buffer);
+    // data_structure->add_edge(single_byte_buff, ref_cnt);
+    // data_structure->add_edge(heap_byte_buffer, byte_array);
 
-    // data_structure->add_edge(s1, s2);
-    // data_structure->add_edge(s2, s3);
-    // data_structure->add_edge(s2, ChiPointer);
-
-    // // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
-    // // _data_structures.add(data_structure_region_set);
     // _data_structure_types.add(data_structure);
 }
+
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     // Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
+//     // Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
+//     // Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
+//     // Symbol* s3 = SymbolTable::new_symbol("[I");
+
+//     // G1DataStructure* data_structure = new G1DataStructure();
+//     // data_structure->add_root(s1);
+//     // // data_structure->add_root(s2);
+
+//     // data_structure->add_edge(s1, s2);
+//     // data_structure->add_edge(s2, s3);
+//     // data_structure->add_edge(s2, ChiPointer);
+
+//     // // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
+//     // // _data_structures.add(data_structure_region_set);
+//     // _data_structure_types.add(data_structure);
+// }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
 //     Symbol* payload = SymbolTable::new_symbol("org/example/gctest/DataStructureTest$MyPayload");
