@@ -399,9 +399,9 @@ HeapWord* HeapRegion::do_oops_on_memregion_in_humongous(MemRegion mr,
 }
 
 
-template <bool in_gc_pause>
+template <class Closure, bool in_gc_pause>
 HeapWord* HeapRegion::do_oops_on_memregion_in_humongous_with_klass(MemRegion mr,
-                                                        G1ScanCardClosure* cl) {
+                                                        Closure* cl) {
   assert(is_humongous(), "precondition");
   HeapRegion* sr = humongous_start_region();
   oop obj = cast_to_oop(sr->bottom());
@@ -564,8 +564,8 @@ inline HeapWord* HeapRegion::oops_on_memregion_iterate(MemRegion mr, Closure* cl
   }
 }
 
-template <bool in_gc_pause>
-inline HeapWord* HeapRegion::oops_on_memregion_iterate_with_klass(MemRegion mr, G1ScanCardClosure* cl) {
+template <class Closure, bool in_gc_pause>
+inline HeapWord* HeapRegion::oops_on_memregion_iterate_with_klass(MemRegion mr, Closure* cl) {
   // Cache the boundaries of the memory region in some const locals
   G1CollectedHeap* g1h = G1CollectedHeap::heap();
   HeapWord* const start = mr.start();
@@ -591,7 +591,7 @@ inline HeapWord* HeapRegion::oops_on_memregion_iterate_with_klass(MemRegion mr, 
     // Limit the MemRegion to the part of the area to scan to the unparsable one as using the bitmap
     // is slower than blindly iterating the objects.
     MemRegion mr_in_unparsable(mr.start(), MIN2(mr.end(), pb));
-    cur = oops_on_memregion_iterate_in_unparsable<G1ScanCardClosure>(mr_in_unparsable, cur, cl);
+    cur = oops_on_memregion_iterate_in_unparsable<Closure>(mr_in_unparsable, cur, cl);
     // We might have scanned beyond end at this point because of imprecise iteration.
     if (cur >= end) {
       return cur;
@@ -662,14 +662,14 @@ HeapWord* HeapRegion::oops_on_memregion_seq_iterate_careful(MemRegion mr,
 }
 
 
-template <bool in_gc_pause>
+template <class Closure, bool in_gc_pause>
 HeapWord* HeapRegion::oops_on_memregion_seq_iterate_careful_with_klass(MemRegion mr,
-                                                            G1ScanCardClosure* cl) {
+                                                            Closure* cl) {
   assert(MemRegion(bottom(), top()).contains(mr), "Card region not in heap region");
 
   // Special handling for humongous regions.
   if (is_humongous()) {
-    return do_oops_on_memregion_in_humongous_with_klass<in_gc_pause>(mr, cl);
+    return do_oops_on_memregion_in_humongous_with_klass<Closure, in_gc_pause>(mr, cl);
   }
   assert(is_old(), "Wrongly trying to iterate over region %u type %s", _hrm_index, get_type_str());
 
@@ -681,7 +681,7 @@ HeapWord* HeapRegion::oops_on_memregion_seq_iterate_careful_with_klass(MemRegion
   // case there might be objects that have their classes unloaded and
   // therefore needs to be scanned using the bitmap.
 
-  return oops_on_memregion_iterate_with_klass<in_gc_pause>(mr, cl);
+  return oops_on_memregion_iterate_with_klass<Closure, in_gc_pause>(mr, cl);
 }
 
 

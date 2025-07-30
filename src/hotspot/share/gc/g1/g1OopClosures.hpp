@@ -41,6 +41,7 @@ class G1ParScanThreadState;
 class G1ScanEvacuatedObjClosure;
 class G1CMTask;
 class ReferenceProcessor;
+class G1DataStructureManager;
 // class SymbolHandle;
 
 
@@ -105,27 +106,27 @@ class G1ScanDataStructureOutCardClosure : public OopIterateClosure {
   // SymbolHandle _from_klass_name;
   // Symbol* _from_klass_name;
   // size_t _array_acc;
-  // Symbol* _from_klass_name;
+  Symbol* _from_klass_name;
+  G1DataStructureManager* _ds_manager;
 public:
-  G1ScanDataStructureOutCardClosure(G1CollectedHeap* g1h, G1CMTask* cm_task) :
-        OopIterateClosure(), _g1h(g1h), _cm_task(cm_task) { }
+  G1ScanDataStructureOutCardClosure(G1CollectedHeap* g1h, G1CMTask* cm_task);
 
   template <class T> void do_oop_work(T* p);
   virtual void do_oop(narrowOop* p) { do_oop_work(p); }
   virtual void do_oop(oop* p)       { do_oop_work(p); }
   template <class T> void inline rebuild_remset(T* p);
-  // void set_from_oop(oop from_oop) {
-  //   _from_oop = from_oop;
-  //   if( from_oop != nullptr && from_oop->klass() != nullptr){
-  //     // log_info(gc)("handle 1");
-  //     _from_klass_name = from_oop->klass()->name();
-  //     // _from_klass_name = SymbolHandle(k->name());
-  //   } else {
-  //     // log_info(gc)("handle 2");
-  //     _from_klass_name = nullptr;
-  //     // _from_klass_name = SymbolHandle();
-  //   }
-  // }
+  void set_from_oop(oop from_oop) {
+    _from_oop = from_oop;
+    if( from_oop != nullptr && from_oop->klass() != nullptr){
+      // log_info(gc)("handle 1");
+      _from_klass_name = from_oop->klass()->name();
+      // _from_klass_name = SymbolHandle(k->name());
+    } else {
+      // log_info(gc)("handle 2");
+      _from_klass_name = nullptr;
+      // _from_klass_name = SymbolHandle();
+    }
+  }
 
   virtual bool do_metadata() { return false; }
   virtual void do_klass(Klass* k) { ShouldNotReachHere(); }

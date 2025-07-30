@@ -26,6 +26,7 @@
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "gc/g1/g1OopClosures.inline.hpp"
 #include "gc/g1/g1ParScanThreadState.hpp"
+#include "gc/g1/g1DataStructureManager.hpp"
 #include "memory/iterator.inline.hpp"
 #include "utilities/stack.inline.hpp"
 
@@ -58,3 +59,6 @@ void G1CLDScanClosure::do_cld(ClassLoaderData* cld) {
   }
   _count++;
 }
+
+G1ScanDataStructureOutCardClosure::G1ScanDataStructureOutCardClosure(G1CollectedHeap* g1h, G1CMTask* cm_task) :
+OopIterateClosure(), _g1h(g1h), _cm_task(cm_task), _ds_manager(g1h->data_structure_manager()) { }

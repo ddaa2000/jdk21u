@@ -976,7 +976,7 @@ void G1ConcurrentMark::scan_root_regions() {
 
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
-    _g1h->print_region_types();
+    // _g1h->print_region_types();
   }
 
   if (root_regions()->scan_in_progress()) {
@@ -1446,7 +1446,7 @@ void G1ConcurrentMark::remark() {
 
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
-    // _g1h->print_region_types();
+    _g1h->print_region_types();
   }
 
   // if(!should_do_detailed_concurrent_gc()) {
@@ -1498,11 +1498,11 @@ class G1ReclaimEmptyRegionsTask : public WorkerTask {
           _g1h->free_humongous_region(hr, _local_cleanup_list);
         } else {
           _old_regions_removed++;
-          if(hr->data_structure() != nullptr){
-            log_info(gc)("free old data structure region %u id %u", hr->hrm_index(), hr->data_structure()->id());
-          } else {
-            log_info(gc)("free old region %u", hr->hrm_index());
-          }
+          // if(hr->data_structure() != nullptr){
+          //   log_info(gc)("free old data structure region %u id %u", hr->hrm_index(), hr->data_structure()->id());
+          // } else {
+          //   log_info(gc)("free old region %u", hr->hrm_index());
+          // }
           _g1h->free_region(hr, _local_cleanup_list);
         }
         hr->clear_cardtable();
@@ -2723,7 +2723,7 @@ void G1CMTask::process_data_structure_out_cards(uint region_idx, MemRegion mr){
   G1ScanDataStructureOutCardClosure card_cl(_g1h, this);
 
   // HeapWord* const scanned_to = card_region->oops_on_memregion_seq_iterate_careful<true>(mr, &card_cl);
-  HeapWord* const scanned_to = card_region->oops_on_memregion_seq_iterate_careful<true>(mr, &card_cl);
+  HeapWord* const scanned_to = card_region->oops_on_memregion_seq_iterate_careful_with_klass<G1ScanDataStructureOutCardClosure, true>(mr, &card_cl);
 
   // assert(scanned_to != nullptr, "Should be able to scan range");
   // assert(scanned_to >= mr.end(), "Scanned to " PTR_FORMAT " less than range " PTR_FORMAT, p2i(scanned_to), p2i(mr.end()));
@@ -3388,6 +3388,10 @@ BuildReverseRemsetClosure::~BuildReverseRemsetClosure(){
 bool BuildReverseRemsetClosure::do_heap_region(HeapRegion* r){
   // _g1h->rem_set()->prepare_region_for_scan(r);
   r->prepare_remset_for_scan();
+  if(r->top_at_mark_start() == r->bottom()){
+    return false;
+  }
+  
   BuildRegionReverseRemsetClosure cl(_g1h, this, _ds_manager, _g1h->card_table(), r);
   // BuildEmptyClosure empty_cl;
   // memset((void*)_incoming_regions, 0, sizeof(bool)*_num_regions);
@@ -3398,8 +3402,10 @@ bool BuildReverseRemsetClosure::do_heap_region(HeapRegion* r){
 
 
   r->prepare_remset_for_scan();
-  // log_info(gc)("before real iter");
+  // log_info(gc)("before iterate region %u, %s", r->hrm_index(), r->data_structure() != nullptr ? "has data structure" : "no data structure");
   r->rem_set()->iterate_cards_safepoint(cl);
+  // log_info(gc)("after iterate region %u, %s", r->hrm_index(), r->data_structure() != nullptr ? "has data structure" : "no data structure");
+
   // log_info(gc)("after real iter");
 
 
@@ -3456,9 +3462,11 @@ void BuildRegionReverseRemsetClosure::do_card(uint region_idx, uint card_idx){
   assert((HeapWord*)_ct->byte_for_index(card_global_idx) < region->top(), "card must be smaller than top");
   if(_to_region->data_structure()!= nullptr) {
     data_structure_instance->add_out_instance(_to_region->data_structure());
+    // log_info(gc)("add out instance");
     // data_structure_instance->add_out_card_data(cv);
     // data_structure_instance->add_out_card(cv);
   } else {
+    // log_info(gc)("add out card");
     data_structure_instance->add_out_card(cv);
   }
   // log_info(gc)("do card out");

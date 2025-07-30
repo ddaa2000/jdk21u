@@ -248,11 +248,11 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
     // been aborted.
     bool scan_and_scrub_to_pb(HeapRegion* hr, HeapWord* start, HeapWord* const limit) {
       bool all_alive = hr->data_structure() != nullptr && hr->data_structure()->is_alive() && !_cm->should_do_detailed_concurrent_gc();
-      if(all_alive){
-        log_info(gc)("region %u is all alive, no need to scrub", hr->hrm_index());
-      } else {
-        log_info(gc)("region %u is not all alive, need to scrub", hr->hrm_index());
-      }
+      // if(all_alive){
+      //   log_info(gc)("region %u is all alive, no need to scrub", hr->hrm_index());
+      // } else {
+      //   log_info(gc)("region %u is not all alive, need to scrub", hr->hrm_index());
+      // }
       // bool all_alive = false;
       while (start < limit) {
         if (all_alive || _bitmap->is_marked(start)) {
@@ -306,7 +306,7 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
       // }
 
       if(no_need_to_scrub) {
-        log_info(gc)("no need to scrub region %u", hr->hrm_index());
+        // log_info(gc)("no need to scrub region %u", hr->hrm_index());
       }
 
       if (!no_need_to_scrub && scan_and_scrub_to_pb(hr, hr->bottom(), pb)) {

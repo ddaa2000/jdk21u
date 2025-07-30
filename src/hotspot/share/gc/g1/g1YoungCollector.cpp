@@ -1085,6 +1085,8 @@ void G1YoungCollector::collect() {
       }
     }
 
+    // cm->set_should_do_detailed_concurrent_gc(true);
+
 
 
     pre_evacuate_collection_set(jtm.evacuation_info());

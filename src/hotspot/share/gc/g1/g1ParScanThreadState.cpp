@@ -48,6 +48,7 @@
 #include "utilities/globalDefinitions.hpp"
 #include "utilities/macros.hpp"
 // #include "gc/shared/referenceHashMap.hpp"
+#include "classfile/symbolTable.hpp"
 
 
 
@@ -429,6 +430,17 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
     if (obj_ptr == nullptr) {
       if(data_structure == nullptr){
         data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+        // static Symbol* l_double = SymbolTable::new_symbol("[D");
+        // if(old->klass()->name() == l_double) {
+        //   if(from_obj != nullptr) {
+        //       log_info(gc)("not found p2 l_double, from class %s, from region %u, from region type %s, from region ds %s",
+        //                     from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
+        //                     _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
+        //                     _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
+        //   } else {
+        //       log_info(gc)("not found p2 l_double, from class null, from region null, from region type null");
+        //   }
+        // }
       }
       obj_ptr = allocate_in_next_plab(dest_attr,
                                       word_sz,
@@ -498,23 +510,25 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   // }
 
-  // G1DataStructureRegionSet* target_data_structure = nullptr;
-  // target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  G1DataStructureRegionSet* target_data_structure = nullptr;
+  target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
 
-  // if(target_data_structure != nullptr){
-  //   dest_attr = G1HeapRegionAttr::Old;
-  // } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
+  if(target_data_structure != nullptr){
+    dest_attr = G1HeapRegionAttr::Old;
+  } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
+    dest_attr = region_attr;
+  } else {
+    dest_attr = next_region_attr(region_attr, old_mark, age);
+  }
+
+
+  // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   //   dest_attr = region_attr;
   // } else {
   //   dest_attr = next_region_attr(region_attr, old_mark, age);
   // }
 
 
-  if(from_obj_region != nullptr && from_obj_region->is_young()) {
-    dest_attr = region_attr;
-  } else {
-    dest_attr = next_region_attr(region_attr, old_mark, age);
-  }
   // dest_attr = next_region_attr(region_attr, old_mark, age);
 
 
@@ -526,11 +540,30 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
 
   // HeapWord* obj_ptr = _plab_allocator->plab_allocate(dest_attr, word_sz, node_index);
 
+  // static Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
+  // static Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
+
+  // static Symbol* tuple2_array = SymbolTable::new_symbol("[Lscala/Tuple2;");
   
-  G1DataStructureRegionSet* target_data_structure = nullptr;
-  if(dest_attr.is_old()){
-    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-  }
+  static Symbol* l_double = SymbolTable::new_symbol("[D");
+  
+  // G1DataStructureRegionSet* target_data_structure = nullptr;
+  bool special_mark = false;
+  // if(dest_attr.is_old()){
+  //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  //   if(target_data_structure == nullptr && old->klass()->name() == l_double) {
+  //     if(from_obj != nullptr) {
+  //         log_info(gc)("not found l_double, from class %s, from region %u, from region type %s, from region ds %s",
+  //                      from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
+  //                      _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
+  //                      _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
+  //     } else {
+  //         log_info(gc)("not found l_double, from class null, from region null, from region type null");
+  //     }
+  //   } else if(target_data_structure != nullptr && old->klass()->name() == l_double){
+  //     special_mark = true;
+  //   }
+  // }
 
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){
@@ -583,6 +616,12 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // may not be up to date for them.
   const oop forward_ptr = old->forward_to_atomic(obj, old_mark, memory_order_relaxed);
   if (forward_ptr == nullptr) {
+    // if(special_mark){
+    //   HeapRegion* to_region = _g1h->heap_region_containing(obj);
+    //   if(to_region->data_structure() == nullptr ){
+    //     ShouldNotReachHere();
+    //   }
+    // }
 
     {
       const uint young_index = from_region->young_index_in_cset();

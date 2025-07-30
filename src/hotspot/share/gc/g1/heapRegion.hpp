@@ -261,8 +261,8 @@ private:
   template <class Closure, bool in_gc_pause>
   inline HeapWord* oops_on_memregion_iterate(MemRegion mr, Closure* cl);
 
-  template <bool in_gc_pause>
-  inline HeapWord* oops_on_memregion_iterate_with_klass(MemRegion mr, G1ScanCardClosure* cl);
+  template <class Closure, bool in_gc_pause>
+  inline HeapWord* oops_on_memregion_iterate_with_klass(MemRegion mr, Closure* cl);
 
   template <class Closure>
   inline HeapWord* oops_on_memregion_iterate_in_unparsable(MemRegion mr, HeapWord* block_start, Closure* cl);
@@ -278,9 +278,9 @@ private:
   inline HeapWord* do_oops_on_memregion_in_humongous(MemRegion mr,
                                                      Closure* cl);
 
-  template <bool in_gc_pause>
+  template <class Closure, bool in_gc_pause>
   inline HeapWord* do_oops_on_memregion_in_humongous_with_klass(MemRegion mr,
-                                                    G1ScanCardClosure* cl);
+                                                    Closure* cl);
 
   inline bool is_marked_in_bitmap(oop obj) const;
 
@@ -559,8 +559,8 @@ public:
   template <bool in_gc_pause, class Closure>
   inline HeapWord* oops_on_memregion_seq_iterate_careful(MemRegion mr, Closure* cl);
 
-  template <bool in_gc_pause>
-  inline HeapWord* oops_on_memregion_seq_iterate_careful_with_klass(MemRegion mr, G1ScanCardClosure* cl);
+  template <class Closure, bool in_gc_pause>
+  inline HeapWord* oops_on_memregion_seq_iterate_careful_with_klass(MemRegion mr, Closure* cl);
 
   // Routines for managing a list of code roots (attached to the
   // this region's RSet) that point into this heap region.

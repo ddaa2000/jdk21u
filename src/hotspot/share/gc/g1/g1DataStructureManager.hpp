@@ -60,6 +60,7 @@ public:
     G1DataStructureManager() : _data_structures(), _data_structure_types(), _present_id(0), 
         _allocator(nullptr), _evacuation_info(nullptr), _data_structures_lock(Mutex::nosafepoint, "data_structures lock") {}
     
+    void check_add_humongous(oop from_oop, oop to_oop);
     G1DataStructureRegionSet* get_data_structure(oop from_oop, oop to_oop);
     void init_data_structure_alloc_regions(G1Allocator* allocator, G1EvacInfo* evacuation_info);
     void release_data_structure_alloc_regions();

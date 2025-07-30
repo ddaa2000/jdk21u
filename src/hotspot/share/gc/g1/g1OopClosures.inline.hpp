@@ -159,6 +159,13 @@ inline void G1ConcurrentRefineOopClosure::do_oop_work(T* p) {
   assert(to_rem_set != nullptr, "Need per-region 'into' remsets.");
   if (to_rem_set->is_tracked()) {
     to_rem_set->add_reference(p, _worker_id);
+    // HeapRegion* from_region = _g1h->heap_region_containing(p);
+    // if (from_region->data_structure() != nullptr) {
+    //   log_info(gc)("add remset from region %u to region %u, obj class %s",
+    //                from_region->hrm_index(),
+    //                _g1h->heap_region_containing(obj)->hrm_index(),
+    //                obj->klass()->name()->as_C_string());
+    // }
   }
 }
 
@@ -219,6 +226,8 @@ inline void G1ScanDataStructureOutCardClosure::rebuild_remset(T* p) {
   // }
 }
 
+
+
 template <class T>
 inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
   G1ConcurrentMark* cm = G1CollectedHeap::heap()->concurrent_mark();
@@ -236,6 +245,25 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
   if(data_structure_instance == nullptr) {
     ShouldNotReachHere();
   }
+
+  oop obj = RawAccess<MO_RELAXED>::oop_load(p);
+  if(obj != nullptr){
+    HeapRegion* to_region = _g1h->heap_region_containing(obj);
+    if(to_region->data_structure() == nullptr) {
+      log_info(gc)("out obj, klass %s, from obj %p, from klass %s, region %s %u", obj->klass()->name()->as_C_string(),
+        _from_oop, _from_klass_name->as_C_string(),
+        to_region->is_humongous()?"humongous":(to_region->is_young()? "young": "old"), to_region->hrm_index());
+      if(to_region->is_humongous()){
+        _ds_manager->check_add_humongous(_from_oop, obj);
+      }
+      // log_info(gc)("out ds obj, klass %s", obj->klass()->name()->as_C_string());
+      // ShouldNotReachHere();
+      // return;
+    } else {
+      return;
+    }
+  }
+  
   _cm_task->deal_with_reference_ds(p, data_structure_instance);
   // static uint x = 0;
   // T o = RawAccess<>::oop_load(p);
