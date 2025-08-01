@@ -1446,7 +1446,7 @@ void G1ConcurrentMark::remark() {
 
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
-    _g1h->print_region_types();
+    // _g1h->print_region_types();
   }
 
   // if(!should_do_detailed_concurrent_gc()) {
@@ -3387,11 +3387,11 @@ BuildReverseRemsetClosure::~BuildReverseRemsetClosure(){
 
 bool BuildReverseRemsetClosure::do_heap_region(HeapRegion* r){
   // _g1h->rem_set()->prepare_region_for_scan(r);
-  r->prepare_remset_for_scan();
+  // r->prepare_remset_for_scan();
   if(r->top_at_mark_start() == r->bottom()){
     return false;
   }
-  
+
   BuildRegionReverseRemsetClosure cl(_g1h, this, _ds_manager, _g1h->card_table(), r);
   // BuildEmptyClosure empty_cl;
   // memset((void*)_incoming_regions, 0, sizeof(bool)*_num_regions);

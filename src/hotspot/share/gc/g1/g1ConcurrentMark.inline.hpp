@@ -231,6 +231,8 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
           MemRegion mr(card_start, MIN2(scan_end, hr->top()));
           log_info(gc)("scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
           process_data_structure_out_cards(hr->hrm_index(), mr);
+          // log_info(gc)("after scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
+
         }
       });
     } else {

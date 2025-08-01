@@ -253,9 +253,11 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
       log_info(gc)("out obj, klass %s, from obj %p, from klass %s, region %s %u", obj->klass()->name()->as_C_string(),
         _from_oop, _from_klass_name->as_C_string(),
         to_region->is_humongous()?"humongous":(to_region->is_young()? "young": "old"), to_region->hrm_index());
+
       if(to_region->is_humongous()){
         _ds_manager->check_add_humongous(_from_oop, obj);
       }
+
       // log_info(gc)("out ds obj, klass %s", obj->klass()->name()->as_C_string());
       // ShouldNotReachHere();
       // return;
@@ -263,8 +265,13 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
       return;
     }
   }
+
+  // log_info(gc)("before deal with ds");
   
   _cm_task->deal_with_reference_ds(p, data_structure_instance);
+
+  // log_info(gc)("after deal with ds");
+
   // static uint x = 0;
   // T o = RawAccess<>::oop_load(p);
   // if (CompressedOops::is_null(o)) {

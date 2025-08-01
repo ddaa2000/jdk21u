@@ -543,26 +543,27 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // static Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
   // static Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
 
-  // static Symbol* tuple2_array = SymbolTable::new_symbol("[Lscala/Tuple2;");
+  static Symbol* tuple2_array = SymbolTable::new_symbol("[Lscala/Tuple2;");
   
   static Symbol* l_double = SymbolTable::new_symbol("[D");
   
   // G1DataStructureRegionSet* target_data_structure = nullptr;
-  bool special_mark = false;
+  // bool special_mark = false;
   // if(dest_attr.is_old()){
   //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
-  //   if(target_data_structure == nullptr && old->klass()->name() == l_double) {
-  //     if(from_obj != nullptr) {
-  //         log_info(gc)("not found l_double, from class %s, from region %u, from region type %s, from region ds %s",
-  //                      from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
-  //                      _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
-  //                      _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
-  //     } else {
-  //         log_info(gc)("not found l_double, from class null, from region null, from region type null");
-  //     }
-  //   } else if(target_data_structure != nullptr && old->klass()->name() == l_double){
-  //     special_mark = true;
-  //   }
+    // if(target_data_structure == nullptr && old->klass()->name() == tuple2_array) {
+    //   if(from_obj != nullptr) {
+    //       log_info(gc)("not found tuple2, from class %s, from region %u, from region type %s, from region ds %s",
+    //                    from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
+    //                    _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
+    //                    _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
+    //   } else {
+    //       log_info(gc)("not found tuple2, from class null, from region null, from region type null");
+    //   }
+    // } 
+    // else if(target_data_structure != nullptr && old->klass()->name() == l_double){
+    //   special_mark = true;
+    // }
   // }
 
   // if(target_data_structure != nullptr){

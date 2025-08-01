@@ -31,10 +31,11 @@ G1DataStructure* G1DataStructureManager::get_data_structure_by_root(Symbol* root
 //     G1DataStructureRegionSet* data_structure = nullptr;
 //     G1DataStructure* data_structure_type = nullptr;
 
-//     Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
-//     Symbol* l_compact_buffer = SymbolTable::new_symbol("[Lorg/apache/spark/util/collection/CompactBuffer;");
-//     Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
-//     Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
+//     static Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
+//     static Symbol* l_compact_buffer = SymbolTable::new_symbol("[Lorg/apache/spark/util/collection/CompactBuffer;");
+//     static Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
+//     static Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
+//     static Symbol* l_tuple2 = SymbolTable::new_symbol("[Lscala/Tuple2;");
 
 //     if (from_oop != nullptr) {
 //         Symbol* from_symbol = from_oop->klass()->name();
@@ -49,31 +50,25 @@ G1DataStructure* G1DataStructureManager::get_data_structure_by_root(Symbol* root
 //                 // log_info(gc)("found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
 //                 return data_structure;
 //             } else {
-//                 log_info(gc)("not found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
+//                 // log_info(gc)("not found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
 //             }
 //         } else if(from_region->is_humongous()){
-//             log_info(gc)("humongous region %u", from_region->hrm_index());
+//             // log_info(gc)("humongous region %u", from_region->hrm_index());
 //             data_structure_type = get_data_structure_by_root(from_symbol);
 //             if (data_structure_type == nullptr) {
-//                 log_info(gc)("humongous region %u not root", from_region->hrm_index());
-//                 if(from_oop->klass()->name() == l_object) {
-//                     log_info(gc)("humongous region %u is lobj", from_region->hrm_index());
-//                     objArrayOop obj_array = objArrayOop(from_oop);
-//                     if(to_symbol == tuple2 || to_symbol == l_compact_buffer || to_symbol == tuple2_mcII_sp) {
-//                         log_info(gc)("humongous region %u is tuple2 or compact", from_region->hrm_index());
-//                     // if(obj_array->length() > 0 && obj_array->obj_at(0) != nullptr && 
-//                     //     (obj_array->obj_at(0)->klass()->name() == tuple2 || obj_array->obj_at(0)->klass()->name() == l_compact_buffer)) {
-//                         log_info(gc)("humongous region %u is tuple or compact", from_region->hrm_index());
-//                         log_info(gc)("found array from %s, region %u", from_oop != nullptr ? from_oop->klass()->name()->as_C_string() : "null", 
-//                                      g1h->heap_region_containing(from_oop)->hrm_index());
+//                 // log_info(gc)("humongous region %u not root", from_region->hrm_index());
+//                 bool l_object_wanted = from_oop->klass()->name() == l_object && (to_symbol == tuple2 || to_symbol == l_compact_buffer || to_symbol == tuple2_mcII_sp);
+//                 if(l_object_wanted || from_symbol == l_tuple2 || from_symbol == l_compact_buffer) {
+//                         // log_info(gc)("humongous region %u is tuple2 /or compact", from_region->hrm_index());
 //                         LinkedListNode<G1DataStructure*>* p = _data_structure_types.head();
 //                         data_structure_type = *p->data();
 //                         if(data_structure_type == nullptr){
 //                             ShouldNotReachHere();
 //                         }
-//                     } else {
-//                         log_info(gc)("humongous region %u child %s", from_region->hrm_index(), to_symbol->as_C_string());
-//                     }
+//                     // } 
+//                     // else if( || ){
+//                     //     log_info(gc)("humongous region %u child %s", from_region->hrm_index(), to_symbol->as_C_string());
+//                     // }
 //                 }
 //             }
 //             if(data_structure_type != nullptr){
@@ -140,6 +135,7 @@ G1DataStructure* G1DataStructureManager::get_data_structure_by_root(Symbol* root
 //             data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
 //             _data_structures.add(data_structure);
 //             _present_id++;
+//             // log_info(gc)("after create normal");
 //         }
 //         return data_structure;
 //     }
@@ -148,28 +144,28 @@ G1DataStructure* G1DataStructureManager::get_data_structure_by_root(Symbol* root
 
 //     // log_info(gc)("found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
 
-//     if(to_oop->klass()->name() == l_object) {
-//         objArrayOop obj_array = objArrayOop(to_oop);
-//         // SymbolHandle handle(from_symbol);
+//     // if(to_oop->klass()->name() == l_object) {
+//     //     objArrayOop obj_array = objArrayOop(to_oop);
+//     //     // SymbolHandle handle(from_symbol);
 
-//         if(obj_array->length() > 0 && obj_array->obj_at(0) != nullptr && 
-//         (obj_array->obj_at(0)->klass()->name() == tuple2 || obj_array->obj_at(0)->klass()->name() == l_compact_buffer)) {
-//             log_info(gc)("found tuple2 array from %s", from_oop != nullptr ? from_oop->klass()->name()->as_C_string() : "null");
-//             MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
-//             OrderAccess::storestore();
-//             LinkedListNode<G1DataStructure*>* p = _data_structure_types.head();
-//             data_structure_type = *p->data();
-//             data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
-//             {
-//                 log_info(gc)("create data structure for obj %p, at %p, id %u", to_oop, data_structure, _present_id);
-//                 // log_info(gc)("create data structure for obj %p, class %s", to_oop, from_symbol->as_C_string());
-//                 data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
-//                 _data_structures.add(data_structure);
-//                 _present_id++;
-//             }
-//             return data_structure;
-//         }
-//     }
+//     //     if(obj_array->length() > 0 && obj_array->obj_at(0) != nullptr && 
+//     //     (obj_array->obj_at(0)->klass()->name() == tuple2 || obj_array->obj_at(0)->klass()->name() == l_compact_buffer)) {
+//     //         log_info(gc)("found tuple2 array from %s", from_oop != nullptr ? from_oop->klass()->name()->as_C_string() : "null");
+//     //         MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+//     //         OrderAccess::storestore();
+//     //         LinkedListNode<G1DataStructure*>* p = _data_structure_types.head();
+//     //         data_structure_type = *p->data();
+//     //         data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
+//     //         {
+//     //             log_info(gc)("create data structure for obj %p, at %p, id %u", to_oop, data_structure, _present_id);
+//     //             // log_info(gc)("create data structure for obj %p, class %s", to_oop, from_symbol->as_C_string());
+//     //             data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
+//     //             _data_structures.add(data_structure);
+//     //             _present_id++;
+//     //         }
+//     //         return data_structure;
+//     //     }
+//     // }
 
 //     return nullptr;
 // }
@@ -183,7 +179,9 @@ void G1DataStructureManager::check_add_humongous(oop from_oop, oop to_oop) {
     log_info(gc)("check oop %p", to_oop);
     G1DataStructureRegionSet* ds = get_data_structure(from_oop, to_oop);
     if(ds != nullptr){
-        MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+        log_info(gc)("before check oop mutex");
+        // MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+        log_info(gc)("inside check oop mutex");
         OrderAccess::storestore();
         if (to_region->data_structure() == nullptr) {
             ds->add_region(to_region);
@@ -202,6 +200,8 @@ void G1DataStructureManager::check_add_humongous(oop from_oop, oop to_oop) {
             }
         }
     }
+    log_info(gc)("after check oop mutex");
+
 }
 
 G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oop, oop to_oop) {
@@ -405,88 +405,88 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
 //     _data_structure_types.add(data_structure);
     
 // }
-void G1DataStructureManager::initialize_predefined_data_structures() {
-    // [[D -> [D: 96.34%
-    // smile/neighbor/KDTree$Node -> smile/neighbor/KDTree$Node: 3.62%
-    // start recursive
-    // [[D -> [D : weight_factor: 96.34% size_factor: 0.9633962297497565 weight: 3834460710, count: 7802855
-    // num: 0
-    // smile/neighbor/KDTree$Node -> smile/neighbor/KDTree$Node : weight_factor: 3.62% size_factor: 0.036179536402381314 weight: 143999952, count: 23999992
-    Symbol* ll_double = SymbolTable::new_symbol("[[D");
-    Symbol* l_double = SymbolTable::new_symbol("[D");
-    Symbol* kd_tree_node = SymbolTable::new_symbol("smile/neighbor/KDTree$Node");
-    Symbol* kd_tree = SymbolTable::new_symbol("smile/neighbor/KDTree");
-    G1DataStructure* data_structure = new G1DataStructure();
-    data_structure->add_root(ll_double);
-    data_structure->add_edge(ll_double, l_double);
-    data_structure->add_root(kd_tree);
-    data_structure->add_edge(kd_tree, kd_tree_node);
-    data_structure->add_edge(kd_tree_node, kd_tree_node);
-
-    _data_structure_types.add(data_structure);
-}
 
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
-//     // // [Lorg/apache/spark/util/collection/CompactBuffer; -> org/apache/spark/util/collection/CompactBuffer: 28.80%
-//     // // [Lscala/Tuple2; -> scala/Tuple2$mcII$sp: 14.22%
-//     // // [Ljava/lang/Object; -> scala/Tuple2$mcII$sp: 14.20%
-//     // // [Ljava/lang/Object; -> scala/Tuple2: 11.45%
-//     // // [Ljava/lang/Object; -> [Lorg/apache/spark/util/collection/CompactBuffer;: 9.60%
-//     // // org/apache/spark/util/collection/CompactBuffer -> java/lang/Integer: 7.54%
-//     // // [Ljava/lang/Object; -> java/lang/Integer: 6.32%
-//     // // org/apache/spark/util/collection/CompactBuffer -> [Ljava/lang/Object;: 3.52%
-//     // // org/apache/spark/storage/memory/DeserializedMemoryEntry -> [Lscala/Tuple2;: 2.63%
+//     // [[D -> [D: 96.34%
+//     // smile/neighbor/KDTree$Node -> smile/neighbor/KDTree$Node: 3.62%
+//     // start recursive
+//     // [[D -> [D : weight_factor: 96.34% size_factor: 0.9633962297497565 weight: 3834460710, count: 7802855
+//     // num: 0
+//     // smile/neighbor/KDTree$Node -> smile/neighbor/KDTree$Node : weight_factor: 3.62% size_factor: 0.036179536402381314 weight: 143999952, count: 23999992
+//     Symbol* ll_double = SymbolTable::new_symbol("[[D");
+//     Symbol* l_double = SymbolTable::new_symbol("[D");
+//     Symbol* kd_tree_node = SymbolTable::new_symbol("smile/neighbor/KDTree$Node");
+//     Symbol* kd_tree = SymbolTable::new_symbol("smile/neighbor/KDTree");
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(ll_double);
+//     data_structure->add_edge(ll_double, l_double);
+//     data_structure->add_root(kd_tree);
+//     data_structure->add_edge(kd_tree, kd_tree_node);
+//     data_structure->add_edge(kd_tree_node, kd_tree_node);
 
-//     // // org/apache/spark/util/collection/PartitionedAppendOnlyMap -> [Ljava/lang/Object;: 0.20%, weight: 7209098, count: 69
-//     // // org/apache/spark/util/collection/SizeTrackingAppendOnlyMap -> [Ljava/lang/Object;: 0.07%, weight: 2449452, count: 22
+//     _data_structure_types.add(data_structure);
+// }
 
-//     // Symbol* size_tracking_append_only_map = SymbolTable::new_symbol("org/apache/spark/util/collection/SizeTrackingAppendOnlyMap");
-//     // Symbol* partitioned_append_only_map = SymbolTable::new_symbol("org/apache/spark/util/collection/PartitionedAppendOnlyMap");
-//     // Symbol* compact_buffer = SymbolTable::new_symbol("org/apache/spark/util/collection/CompactBuffer");
-//     // Symbol* l_compact_buffer = SymbolTable::new_symbol("[Lorg/apache/spark/util/collection/CompactBuffer;");
 
-//     // Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
-//     // Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
-//     // Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
-//     // Symbol* l_tuple2_mcII_sp = SymbolTable::new_symbol("[Lscala/Tuple2;");
-//     // Symbol* deserialized_memory_entry = SymbolTable::new_symbol("org/apache/spark/storage/memory/DeserializedMemoryEntry");
-//     // Symbol* integer = SymbolTable::new_symbol("java/lang/Integer");
-//     // // Symbol* l_integer = SymbolTable::new_symbol("[I");
-//     // // Symbol* l_double = SymbolTable::new_symbol("[D");
-//     // // Symbol* double_object = SymbolTable::new_symbol("java/lang/Double");
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     // [Lorg/apache/spark/util/collection/CompactBuffer; -> org/apache/spark/util/collection/CompactBuffer: 28.80%
+//     // [Lscala/Tuple2; -> scala/Tuple2$mcII$sp: 14.22%
+//     // [Ljava/lang/Object; -> scala/Tuple2$mcII$sp: 14.20%
+//     // [Ljava/lang/Object; -> scala/Tuple2: 11.45%
+//     // [Ljava/lang/Object; -> [Lorg/apache/spark/util/collection/CompactBuffer;: 9.60%
+//     // org/apache/spark/util/collection/CompactBuffer -> java/lang/Integer: 7.54%
+//     // [Ljava/lang/Object; -> java/lang/Integer: 6.32%
+//     // org/apache/spark/util/collection/CompactBuffer -> [Ljava/lang/Object;: 3.52%
+//     // org/apache/spark/storage/memory/DeserializedMemoryEntry -> [Lscala/Tuple2;: 2.63%
 
-//     // G1DataStructure* data_structure = new G1DataStructure();
-//     // // data_structure->add_root(deserialized_memory_entry);
+//     // org/apache/spark/util/collection/PartitionedAppendOnlyMap -> [Ljava/lang/Object;: 0.20%, weight: 7209098, count: 69
+//     // org/apache/spark/util/collection/SizeTrackingAppendOnlyMap -> [Ljava/lang/Object;: 0.07%, weight: 2449452, count: 22
+
+//     Symbol* size_tracking_append_only_map = SymbolTable::new_symbol("org/apache/spark/util/collection/SizeTrackingAppendOnlyMap");
+//     Symbol* partitioned_append_only_map = SymbolTable::new_symbol("org/apache/spark/util/collection/PartitionedAppendOnlyMap");
+//     Symbol* compact_buffer = SymbolTable::new_symbol("org/apache/spark/util/collection/CompactBuffer");
+//     Symbol* l_compact_buffer = SymbolTable::new_symbol("[Lorg/apache/spark/util/collection/CompactBuffer;");
+
+//     Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
+//     Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
+//     Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
+//     Symbol* l_tuple2_mcII_sp = SymbolTable::new_symbol("[Lscala/Tuple2;");
+//     Symbol* deserialized_memory_entry = SymbolTable::new_symbol("org/apache/spark/storage/memory/DeserializedMemoryEntry");
+//     Symbol* integer = SymbolTable::new_symbol("java/lang/Integer");
+//     // Symbol* l_integer = SymbolTable::new_symbol("[I");
+//     // Symbol* l_double = SymbolTable::new_symbol("[D");
+//     // Symbol* double_object = SymbolTable::new_symbol("java/lang/Double");
+
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(deserialized_memory_entry);
 //     data_structure->add_root(size_tracking_append_only_map);
-//     // // data_structure->add_root(l_tuple2_mcII_sp);
-//     // data_structure->add_root(partitioned_append_only_map);
-//     // // data_structure->add_root(l_object);
-//     // // data_structure->add_edge(deserialized_memory_entry, l_tuple2_mcII_sp);
-//     // // data_structure->add_edge(l_tuple2_mcII_sp, tuple2_mcII_sp);
+//     // data_structure->add_root(l_tuple2_mcII_sp);
+//     data_structure->add_root(partitioned_append_only_map);
+//     // data_structure->add_root(l_object);
+//     data_structure->add_edge(deserialized_memory_entry, l_tuple2_mcII_sp);
+//     data_structure->add_edge(l_tuple2_mcII_sp, tuple2_mcII_sp);
 //     data_structure->add_edge(size_tracking_append_only_map, l_object);
-//     // data_structure->add_edge(partitioned_append_only_map, l_object);
-//     // // data_structure->add_root(size_tracking_append_only_map);
-//     // // data_structure->add_edge(size_tracking_append_only_map, l_object);
+//     data_structure->add_edge(partitioned_append_only_map, l_object);
 //     data_structure->add_edge(l_object, l_compact_buffer);
-//     // data_structure->add_edge(l_compact_buffer, compact_buffer);
-//     // // data_structure->add_edge(compact_buffer, double_object);
-//     // data_structure->add_edge(compact_buffer, l_object);
-//     // data_structure->add_edge(compact_buffer, integer);
-//     // // data_structure->add_edge(compact_buffer, tuple2);
-//     // data_structure->add_edge(tuple2, tuple2_mcII_sp);
+//     data_structure->add_edge(l_compact_buffer, compact_buffer);
+//     // data_structure->add_edge(compact_buffer, double_object);
+//     data_structure->add_edge(compact_buffer, l_object);
+//     data_structure->add_edge(compact_buffer, integer);
+//     // data_structure->add_edge(compact_buffer, tuple2);
+//     data_structure->add_edge(tuple2, tuple2_mcII_sp);
 
 
 
-//     // data_structure->add_edge(l_object, tuple2_mcII_sp);
-//     // data_structure->add_edge(l_object, tuple2);
-//     // data_structure->add_edge(l_object, integer);
-//     // // data_structure->add_edge(tuple2, integer);
-//     // // data_structure->add_edge(tuple2, double_object);
-//     // // data_structure->add_edge(tuple2, l_double);
+//     data_structure->add_edge(l_object, tuple2_mcII_sp);
+//     data_structure->add_edge(l_object, tuple2);
+//     data_structure->add_edge(l_object, integer);
+//     data_structure->add_edge(tuple2, integer);
+//     // data_structure->add_edge(tuple2, double_object);
+//     // data_structure->add_edge(tuple2, l_double);
 
 
-//     // _data_structure_types.add(data_structure);
+//     _data_structure_types.add(data_structure);
 // }
 
 
@@ -639,22 +639,22 @@ void G1DataStructureManager::initialize_predefined_data_structures() {
 // }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
-//     // Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
-//     // Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
-//     // Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
-//     // Symbol* s3 = SymbolTable::new_symbol("[I");
+//     Symbol* s1 = SymbolTable::new_symbol("[Ledu/cmu/graphchi/ChiVertex;");
+//     Symbol* ChiPointer = SymbolTable::new_symbol("edu/cmu/graphchi/datablocks/ChiPointer");
+//     Symbol* s2 = SymbolTable::new_symbol("edu/cmu/graphchi/ChiVertex");
+//     Symbol* s3 = SymbolTable::new_symbol("[I");
 
-//     // G1DataStructure* data_structure = new G1DataStructure();
-//     // data_structure->add_root(s1);
-//     // // data_structure->add_root(s2);
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(s1);
+//     // data_structure->add_root(s2);
 
-//     // data_structure->add_edge(s1, s2);
-//     // data_structure->add_edge(s2, s3);
-//     // data_structure->add_edge(s2, ChiPointer);
+//     data_structure->add_edge(s1, s2);
+//     data_structure->add_edge(s2, s3);
+//     data_structure->add_edge(s2, ChiPointer);
 
-//     // // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
-//     // // _data_structures.add(data_structure_region_set);
-//     // _data_structure_types.add(data_structure);
+//     // G1DataStructureRegionSet* data_structure_region_set = new G1DataStructureRegionSet(G1CollectedHeap::heap(), data_structure);
+//     // _data_structures.add(data_structure_region_set);
+//     _data_structure_types.add(data_structure);
 // }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
@@ -690,32 +690,32 @@ void G1DataStructureManager::initialize_predefined_data_structures() {
     
 // }
 
+void G1DataStructureManager::initialize_predefined_data_structures() {
+    Symbol* tree_node = SymbolTable::new_symbol("smile/clustering/BBDTree$Node");
+    Symbol* l_d = SymbolTable::new_symbol("[D");
+    G1DataStructure* data_structure = new G1DataStructure();
+    data_structure->add_root(tree_node);
+    data_structure->add_edge(tree_node, tree_node);
+    data_structure->add_edge(tree_node, l_d);
+
+    _data_structure_types.add(data_structure);
+}
+
 // void G1DataStructureManager::initialize_predefined_data_structures() {
-//     Symbol* tree_node = SymbolTable::new_symbol("smile/clustering/BBDTree$Node");
+//     Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
+//     Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
 //     Symbol* l_d = SymbolTable::new_symbol("[D");
+//     Symbol* l_i = SymbolTable::new_symbol("[I");
+//     Symbol* d = SymbolTable::new_symbol("java/lang/Double");
+
 //     G1DataStructure* data_structure = new G1DataStructure();
-//     data_structure->add_root(tree_node);
-//     data_structure->add_edge(tree_node, tree_node);
-//     data_structure->add_edge(tree_node, l_d);
+//     data_structure->add_root(l_tuple3);
+//     data_structure->add_edge(l_tuple3, tuple3);
+//     data_structure->add_edge(tuple3, l_d);
+//     data_structure->add_edge(tuple3, l_i);
+//     data_structure->add_edge(tuple3, d);
 
 //     _data_structure_types.add(data_structure);
-// }
-
-// void G1DataStructureManager::initialize_predefined_data_structures() {
-//     // Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");
-//     // Symbol* tuple3 = SymbolTable::new_symbol("scala/Tuple3");
-//     // Symbol* l_d = SymbolTable::new_symbol("[D");
-//     // Symbol* l_i = SymbolTable::new_symbol("[I");
-//     // Symbol* d = SymbolTable::new_symbol("java/lang/Double");
-
-//     // G1DataStructure* data_structure = new G1DataStructure();
-//     // data_structure->add_root(l_tuple3);
-//     // data_structure->add_edge(l_tuple3, tuple3);
-//     // data_structure->add_edge(tuple3, l_d);
-//     // data_structure->add_edge(tuple3, l_i);
-//     // data_structure->add_edge(tuple3, d);
-
-//     // _data_structure_types.add(data_structure);
     
 // }
 
