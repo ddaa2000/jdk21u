@@ -170,7 +170,7 @@ void G1BarrierSet::on_thread_detach(Thread* thread) {
     G1OopQueue& oop_queue = G1ThreadLocalData::ref_queue(thread);
     oop_queue.flush(map);
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
-    g1h->merge_remove_hash_map(&map);
+    // g1h->merge_remove_hash_map(&map);
     G1BarrierSet::satb_mark_queue_set().flush_queue(queue);
   }
   {
