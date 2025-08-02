@@ -98,7 +98,7 @@ inline void G1ScanEvacuatedObjClosure::do_oop_work(T* p) {
       // uint u = to_name->identity_hash();
       // x += v;
       // x += u;
-      _par_scan_state->reference_hash_map()->add_or_inc(_from_klass_name, obj->klass()->name(), 1, obj->size());
+      // _par_scan_state->reference_hash_map()->add_or_inc(_from_klass_name, obj->klass()->name(), 1, obj->size());
     }
   } else if (!HeapRegion::is_in_same_region(p, obj)) {
     handle_non_cset_obj_common(region_attr, p, obj);

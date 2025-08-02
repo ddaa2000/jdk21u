@@ -38,6 +38,7 @@ private:
   oopDesc** _buffer;
   size_t _index;
   static const size_t _element_size = sizeof(oopDesc*);
+  size_t _total_count, _young_count, _identical_count;
 
 public:
   G1OopQueue();

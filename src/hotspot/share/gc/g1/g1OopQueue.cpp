@@ -28,17 +28,22 @@
 #include "gc/g1/g1CollectedHeap.hpp"
 #include "gc/g1/g1CollectedHeap.inline.hpp"
 #include "oops/oop.inline.hpp"
+#include "logging/log.hpp"
 
 G1OopQueue::G1OopQueue() :
   _buffer(nullptr),
-  _index(0)
-  {
+  _index(0),
+  _total_count(0), _young_count(0), _identical_count(0) {
     _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
     set_index(G1OopBufferSize * 2);
   }
 
 G1OopQueue::~G1OopQueue(){
   FREE_C_HEAP_ARRAY(oopDesc*, _buffer);
+  log_info(gc)("G1OopQueue: total_count: %zu, young_percent: %lf, identical_percent: %lf", 
+              _total_count,
+              _young_count * 100.0 / _total_count,
+              _identical_count * 100.0 / (_total_count - _young_count));
 }
 
 void G1OopQueue::flush(ReferenceHashMap& map) {
@@ -51,12 +56,15 @@ void G1OopQueue::flush(ReferenceHashMap& map) {
   for(size_t i = idx; i < G1OopBufferSize * 2; i += 2 ){
     oopDesc* from = _buffer[i];
     oopDesc* to = _buffer[i + 1];
-    if(g1h->heap_region_containing(to)->is_young()){
+    _total_count += 1;
+    if(g1h->heap_region_containing(to)->is_young() || g1h->heap_region_containing(from)->is_young()){
+      _young_count += 1;
       continue;
     }
     if(pre_from == from->klass()->name() && pre_to == to->klass()->name()){
       pre_count++;
       pre_size += to->size();
+      _identical_count += 1;
     } else {
       if(pre_from != nullptr){
         map.add_or_inc(pre_from, pre_to, pre_count, pre_size);

@@ -81,14 +81,14 @@ public:
   virtual void do_oop(narrowOop* p) { do_oop_work(p); }
   virtual void do_oop(oop* p)       { do_oop_work(p); }
   void set_from_klass(Klass* k) {
-    _from_klass = k;
-    if( k != nullptr){
-      // log_info(gc)("handle 1");
-      _from_klass_name = SymbolHandle(k->name());
-    } else {
-      // log_info(gc)("handle 2");
-      _from_klass_name = SymbolHandle();
-    }
+    // _from_klass = k;
+    // if( k != nullptr){
+    //   // log_info(gc)("handle 1");
+    //   _from_klass_name = SymbolHandle(k->name());
+    // } else {
+    //   // log_info(gc)("handle 2");
+    //   _from_klass_name = SymbolHandle();
+    // }
   }
 };
 
@@ -133,11 +133,11 @@ public:
   }
 
   void set_from_klass(Klass* klass){
-    if( klass != nullptr){
-      _from_klass_name = SymbolHandle(klass->name());
-    } else {
-      _from_klass_name = SymbolHandle();
-    }
+    // if( klass != nullptr){
+    //   _from_klass_name = SymbolHandle(klass->name());
+    // } else {
+    //   _from_klass_name = SymbolHandle();
+    // }
   }
 
 };
