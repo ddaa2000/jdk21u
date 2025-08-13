@@ -203,6 +203,7 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
     if (task_entry.is_array_slice()) {
       _words_scanned += _objArray_processor.process_slice(task_entry.slice());
     } else if (task_entry.is_data_structure_instance()){
+      // log_info(gc)("handle ds start");
 //      if(_cm->should_do_detailed_concurrent_gc()){
 //        ShouldNotReachHere();
 //      }
@@ -229,12 +230,13 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
         HeapWord* scan_end = MIN2(card_end, hr->top());
         if(card_start < scan_end){
           MemRegion mr(card_start, MIN2(scan_end, hr->top()));
-          log_info(gc)("scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
+          // log_info(gc)("scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
           process_data_structure_out_cards(hr->hrm_index(), mr);
           // log_info(gc)("after scan card %p to %p", card_start, MIN2(scan_end, hr->top()));
 
         }
       });
+      // log_info(gc)("handle ds end");
     } else {
       oop obj = task_entry.obj();
       if (G1CMObjArrayProcessor::should_be_sliced(obj)) {

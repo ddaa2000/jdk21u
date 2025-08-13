@@ -429,7 +429,8 @@ HeapWord* G1ParScanThreadState::allocate_copy_slow(G1HeapRegionAttr* dest_attr,
                                                            data_structure);
     if (obj_ptr == nullptr) {
       if(data_structure == nullptr){
-        data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+        bool newly_created = false;
+        data_structure = _plab_allocator->data_structure_region_set(from_obj, old, newly_created);
         // static Symbol* l_double = SymbolTable::new_symbol("[D");
         // if(old->klass()->name() == l_double) {
         //   if(from_obj != nullptr) {
@@ -510,23 +511,30 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   // }
 
-  G1DataStructureRegionSet* target_data_structure = nullptr;
-  target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  // G1DataStructureRegionSet* target_data_structure = nullptr;
+  // target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
 
-  if(target_data_structure != nullptr){
-    dest_attr = G1HeapRegionAttr::Old;
-  } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
-    dest_attr = region_attr;
-  } else {
-    dest_attr = next_region_attr(region_attr, old_mark, age);
-  }
-
-
-  // if(from_obj_region != nullptr && from_obj_region->is_young()) {
+  // if(target_data_structure != nullptr){
+  //   dest_attr = G1HeapRegionAttr::Old;
+  // } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
   //   dest_attr = region_attr;
   // } else {
   //   dest_attr = next_region_attr(region_attr, old_mark, age);
   // }
+
+
+  // static Symbol* skip_list_index = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Index");
+
+
+  if(from_obj_region != nullptr && from_obj_region->is_young()) {
+    dest_attr = region_attr;
+  } 
+  // else if (klass->name() == skip_list_index && (from_obj_region==nullptr || from_obj_region->data_structure() == nullptr)) {
+  //   dest_attr = region_attr;
+  // } 
+  else {
+    dest_attr = next_region_attr(region_attr, old_mark, age);
+  }
 
 
   // dest_attr = next_region_attr(region_attr, old_mark, age);
@@ -543,14 +551,18 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // static Symbol* tuple2_mcII_sp = SymbolTable::new_symbol("scala/Tuple2$mcII$sp");
   // static Symbol* tuple2 = SymbolTable::new_symbol("scala/Tuple2");
 
-  static Symbol* tuple2_array = SymbolTable::new_symbol("[Lscala/Tuple2;");
+  // static Symbol* tuple2_array = SymbolTable::new_symbol("[Lscala/Tuple2;");
   
-  static Symbol* l_double = SymbolTable::new_symbol("[D");
+  // static Symbol* l_double = SymbolTable::new_symbol("[D");
   
-  // G1DataStructureRegionSet* target_data_structure = nullptr;
+  G1DataStructureRegionSet* target_data_structure = nullptr;
   // bool special_mark = false;
-  // if(dest_attr.is_old()){
-  //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  if(dest_attr.is_old()){
+    bool newly_created = false;
+    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old, newly_created);
+    // if(newly_created && target_data_structure != nullptr){
+    //   log_info(gc)("newly created %s", dest_attr.get_type_str());
+    // }
     // if(target_data_structure == nullptr && old->klass()->name() == tuple2_array) {
     //   if(from_obj != nullptr) {
     //       log_info(gc)("not found tuple2, from class %s, from region %u, from region type %s, from region ds %s",
@@ -564,7 +576,7 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
     // else if(target_data_structure != nullptr && old->klass()->name() == l_double){
     //   special_mark = true;
     // }
-  // }
+  }
 
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){

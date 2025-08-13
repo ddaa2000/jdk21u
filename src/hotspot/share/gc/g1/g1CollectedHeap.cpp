@@ -1283,7 +1283,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _ref_processor_cm(nullptr),
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
-  _region_attr() {
+  _region_attr(),
+  _size_copied() {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1554,6 +1555,7 @@ void G1CollectedHeap::stop() {
   // do not continue to execute and access resources (e.g. logging)
   // that are destroyed during shutdown.
   reference_hash_map()->print_all();
+  log_info(gc)("size copied: %lu", _size_copied);
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();
@@ -3228,7 +3230,56 @@ public:
   }
 };
 
+class SummarizeRegionTypeClosure: public HeapRegionClosure {
+public:
+  size_t _old, _old_data, _humongous, _humongous_data;
+  size_t _old_used, _old_data_used, _old_total, _old_data_total;
+  SummarizeRegionTypeClosure() :
+    _old(0), _old_data(0), _humongous(0), _humongous_data(0),
+    _old_used(0), _old_data_used(0), _old_total(0), _old_data_total(0) {
+    // Initialize counters
+  }
+  bool do_heap_region(HeapRegion* r) {
+    ResourceMark rm;
+    const char* tracking_state = r->rem_set()->is_tracked() ? "tracked" : "not tracked";
+    if(r->data_structure() != nullptr){
+      if(r->is_humongous()){
+        _humongous_data++;
+      } else if(r->is_old()){
+        _old_data++;
+        _old_data_used += r->used();
+        _old_data_total += r->capacity();
+      }
+    } else {
+      if(r->is_humongous()){
+        _humongous++;
+
+      } else if(r->is_old()){
+        _old_used += r->used();
+        _old_total += r->capacity();
+        _old++;
+      } else if(r->is_young()){
+      }
+      else {
+        return false;
+      }
+    }
+      // log_info(gc)("from %p to %p", r->bottom(), r->end());
+      return false;
+    }
+};
+
 void G1CollectedHeap::print_region_types() {
   PrintHeapRegionTypeClosure cl;
   heap_region_iterate(&cl);
+}
+
+void G1CollectedHeap::print_region_types_summary() {
+  SummarizeRegionTypeClosure cl;
+  heap_region_iterate(&cl);
+  log_info(gc)("Region types summary: Old: %lu, Old Data: %lu, Humongous: %lu, Humongous Data: %lu",
+               cl._old, cl._old_data, cl._humongous, cl._humongous_data);
+  log_info(gc)("Old used percent %.2lf, Old data used percent %.2lf",
+               (double)cl._old_used / cl._old_total * 100.0,
+               (double)cl._old_data_used / cl._old_data_total * 100.0);
 }

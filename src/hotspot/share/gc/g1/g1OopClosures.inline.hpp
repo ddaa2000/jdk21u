@@ -250,12 +250,12 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
   if(obj != nullptr){
     HeapRegion* to_region = _g1h->heap_region_containing(obj);
     if(to_region->data_structure() == nullptr) {
-      log_info(gc)("out obj, klass %s, from obj %p, from klass %s, region %s %u", obj->klass()->name()->as_C_string(),
-        _from_oop, _from_klass_name->as_C_string(),
-        to_region->is_humongous()?"humongous":(to_region->is_young()? "young": "old"), to_region->hrm_index());
+      // log_info(gc)("out obj, klass %s, from obj %p, from klass %s, region %s %u", obj->klass()->name()->as_C_string(),
+      //   _from_oop, _from_klass_name->as_C_string(),
+      //   to_region->is_humongous()?"humongous":(to_region->is_young()? "young": "old"), to_region->hrm_index());
 
       if(to_region->is_humongous()){
-        _ds_manager->check_add_humongous(_from_oop, obj);
+        // _ds_manager->check_add_humongous(_from_oop, obj);
       }
 
       // log_info(gc)("out ds obj, klass %s", obj->klass()->name()->as_C_string());

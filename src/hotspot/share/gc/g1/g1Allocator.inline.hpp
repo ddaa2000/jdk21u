@@ -131,8 +131,8 @@ inline PLAB* G1PLABAllocator::alloc_buffer(region_type_t dest, uint node_index, 
   }
 }
 
-inline G1DataStructureRegionSet* G1PLABAllocator::data_structure_region_set(oop from_oop, oop to_oop) const {
-  return _data_structure_manager->get_data_structure(from_oop, to_oop);
+inline G1DataStructureRegionSet* G1PLABAllocator::data_structure_region_set(oop from_oop, oop to_oop, bool &newly_created) const {
+  return _data_structure_manager->get_data_structure(from_oop, to_oop, newly_created);
 }
 
 inline uint G1PLABAllocator::alloc_buffers_length(region_type_t dest) const {

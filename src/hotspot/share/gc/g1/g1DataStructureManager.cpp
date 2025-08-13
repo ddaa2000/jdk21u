@@ -177,7 +177,8 @@ void G1DataStructureManager::check_add_humongous(oop from_oop, oop to_oop) {
         return;
     }
     log_info(gc)("check oop %p", to_oop);
-    G1DataStructureRegionSet* ds = get_data_structure(from_oop, to_oop);
+    bool newly_created = false;
+    G1DataStructureRegionSet* ds = get_data_structure(from_oop, to_oop, newly_created);
     if(ds != nullptr){
         log_info(gc)("before check oop mutex");
         // MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
@@ -204,7 +205,8 @@ void G1DataStructureManager::check_add_humongous(oop from_oop, oop to_oop) {
 
 }
 
-G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oop, oop to_oop) {
+G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oop, oop to_oop, bool &newly_created) {
+    newly_created = false;
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
     Symbol* to_symbol = to_oop->klass()->name();
     G1DataStructureRegionSet* data_structure = nullptr;
@@ -291,10 +293,16 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
         {
             log_info(gc)("create normal data structure for obj %p, class %s, at %p, id %u, from class %s", to_oop, to_symbol->as_C_string(), data_structure, _present_id,
                          from_oop != nullptr ? from_oop->klass()->name()->as_C_string() : "null");
+            if(from_oop != nullptr){
+                HeapRegion* from_region = g1h->heap_region_containing(from_oop);
+                log_info(gc)("from oop region is %s, %s",
+                    from_region->is_young() ? (from_region->is_survivor()? "survivor": "young other") : "old", from_region->data_structure() == nullptr ? "no ds" : "has ds");
+            }
             data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
             _data_structures.add(data_structure);
             _present_id++;
         }
+        newly_created = true;
         return data_structure;
     }
 
@@ -359,52 +367,267 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
 }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
+// }
 
-//     // java/nio/HeapByteBuffer -> [B : weight_factor: 36.50% size_factor: 0.36499393036008876 weight: 1641539726, count: 24002
-//     // org/apache/cassandra/db/rows/BufferCell -> java/nio/HeapByteBuffer : weight_factor: 90.24% size_factor: 0.3293804708265296 weight: 1017215136, count: 127151892
-//     // [Ljava/lang/Object; -> org/apache/cassandra/db/rows/BufferCell : weight_factor: 100.00% size_factor: 0.3293804708265296 weight: 890089193, count: 127155599
-//     // org/apache/cassandra/db/partitions/BTreePartitionData -> [Ljava/lang/Object; : weight_factor: 19.24% size_factor: 0.06337376136688198 weight: 42225579, count: 14075193
-//     // org/apache/cassandra/db/rows/BTreeRow -> [Ljava/lang/Object; : weight_factor: 77.71% size_factor: 0.25595970092397613 weight: 170544502, count: 14075802
-//     // org/apache/cassandra/db/partitions/AtomicBTreePartition -> org/apache/cassandra/db/partitions/BTreePartitionData : weight_factor: 100.00% size_factor: 0.06337068166005362 weight: 98521983, count: 14074569
-//     // [Ljava/lang/Object; -> org/apache/cassandra/db/rows/BTreeRow : weight_factor: 100.00% size_factor: 0.25595940997401456 weight: 98530530, count: 14075790
-//     // java/util/concurrent/ConcurrentSkipListMap$Node -> org/apache/cassandra/db/partitions/AtomicBTreePartition : weight_factor: 100.00% size_factor: 0.06337068166005362 weight: 81834102, count: 13639017
-//     // java/util/concurrent/ConcurrentSkipListMap$Node -> java/util/concurrent/ConcurrentSkipListMap$Node : weight_factor: 86.38% size_factor: 0.05474268389025206 weight: 59450900, count: 11890180
-//     // java/util/concurrent/ConcurrentSkipListMap$Index -> java/util/concurrent/ConcurrentSkipListMap$Node: 0.21%, weight: 9369905, count: 1873981
-//     // java/util/concurrent/ConcurrentSkipListMap$Index -> java/util/concurrent/ConcurrentSkipListMap$Index: 1.63%, weight: 34335245, count: 6867049
-//     // [Ljava/lang/Object; -> java/util/concurrent/ConcurrentSkipListMap$Index: 0.00%, weight: 615, count: 123
-//     // java/util/concurrent/ConcurrentSkipListMap -> java/util/concurrent/ConcurrentSkipListMap$Index: 0.00%, weight: 580, count: 116
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     // [[F -> [F: 96.12%
+//     // [[J -> [J: 2.53%
+//     // start recursive
+//     // [[F -> [F : weight_factor: 96.12% size_factor: 0.9611592385689974 weight: 9692887360, count: 74560672
+//     // org/neo4j/gds/embeddings/fastrp/FastRP -> [[F : weight_factor: 100.00% size_factor: 0.9611592385689974 weight: 30, count: 15
+//     // num: 1
+//     // [[J -> [J : weight_factor: 2.53% size_factor: 0.025272446813779995 weight: 254862015, count: 3410867
+//     // num: 0
+//     // [[F -> [F: 96.12%, weight: 9692887360, count: 74560672
+//     // [[J -> [J: 2.53%, weight: 254862015, count: 3410867
+//     // [[B -> [B: 1.03%, weight: 104147948, count: 3310956
+//     // [Ljava/lang/reflect/Method; -> java/lang/reflect/Method: 0.09%, weight: 9217926, count: 512107
+//     // java/lang/String -> [B: 0.04%, weight: 3918093, count: 404945
+//     // [[I -> [I: 0.02%, weight: 2205870, count: 1086
+//     // [Ljava/lang/reflect/Field; -> java/lang/reflect/Field: 0.02%, weight: 1846740, count: 131910
+//     // [[[J -> [[J: 0.02%, weight: 1692474, count: 413
+//     // [[[B -> [[B: 0.02%, weight: 1692474, count: 413
 
-
-//     Symbol* skip_list_map = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap");
-//     Symbol* skip_list_index = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Index");
-//     Symbol* skip_list_node = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Node");
-//     Symbol* btree_partition = SymbolTable::new_symbol("org/apache/cassandra/db/partitions/AtomicBTreePartition");
-//     Symbol* btree_partition_data = SymbolTable::new_symbol("org/apache/cassandra/db/partitions/BTreePartitionData");
-//     Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
-//     Symbol* btree_row = SymbolTable::new_symbol("org/apache/cassandra/db/rows/BTreeRow");
-//     Symbol* buffer_cell = SymbolTable::new_symbol("org/apache/cassandra/db/rows/BufferCell");
-//     Symbol* heap_byte_buffer = SymbolTable::new_symbol("java/nio/HeapByteBuffer");
-//     Symbol* l_byte = SymbolTable::new_symbol("[B");
+//     Symbol* float_array_array = SymbolTable::new_symbol("[[F");
+//     Symbol* long_array_array = SymbolTable::new_symbol("[[J");
+//     Symbol* byte_array_array = SymbolTable::new_symbol("[[B");
+//     Symbol* fastrp = SymbolTable::new_symbol("org/neo4j/gds/embeddings/fastrp/FastRP");
+//     Symbol* long_array = SymbolTable::new_symbol("[J");
+//     Symbol* byte_array = SymbolTable::new_symbol("[B");
+//     Symbol* float_array = SymbolTable::new_symbol("[F");
+//     // Symbol* method = SymbolTable::new_symbol("java/lang/reflect/Method");
+//     Symbol* string = SymbolTable::new_symbol("java/lang/String");
+//     Symbol* field = SymbolTable::new_symbol("java/lang/reflect/Field");
+//     // Symbol* int_array = SymbolTable::new_symbol("[I");
+//     Symbol* long_array_array_array = SymbolTable::new_symbol("[[[J");
+//     Symbol* byte_array_array_array = SymbolTable::new_symbol("[[[B");
 
 //     G1DataStructure* data_structure = new G1DataStructure();
-//     // data_structure->add_root(skip_list_map);
-//     data_structure->add_root(skip_list_index);
-//     // data_structure->add_edge(skip_list_map, skip_list_index);
-//     data_structure->add_edge(skip_list_index, skip_list_index);
-//     data_structure->add_edge(skip_list_index, skip_list_node);
-//     data_structure->add_edge(skip_list_node, skip_list_node);
-//     data_structure->add_edge(skip_list_node, btree_partition);
-//     data_structure->add_edge(btree_partition, btree_partition_data);
-//     data_structure->add_edge(btree_partition_data, l_object);
-//     data_structure->add_edge(l_object, btree_row);
-//     data_structure->add_edge(btree_row, l_object);
-//     data_structure->add_edge(l_object, buffer_cell);
-//     data_structure->add_edge(buffer_cell, heap_byte_buffer);
-//     data_structure->add_edge(heap_byte_buffer, l_byte);
+//     data_structure->add_root(float_array_array);
+//     data_structure->add_root(long_array_array_array);
+//     data_structure->add_root(byte_array_array_array);
+//     // data_structure->add_edge(fastrp, float_array_array);
+//     data_structure->add_edge(float_array_array, float_array);
+
+//     // data_structure->add_root(long_array_array_array);
+//     data_structure->add_edge(long_array_array_array, long_array_array);
+//     data_structure->add_edge(long_array_array, long_array);
+
+
+
+//     // data_structure->add_root(byte_array_array_array);
+//     data_structure->add_edge(byte_array_array_array, byte_array_array);
+//     data_structure->add_edge(byte_array_array, byte_array);
 
 //     _data_structure_types.add(data_structure);
-    
+
 // }
+
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     // org/h2/mvstore/Page$Leaf -> [Lorg/h2/value/VersionedValue;: 16.15%
+//     // org/h2/result/DefaultRow -> [Lorg/h2/value/Value;: 9.78%
+//     // org/h2/result/Sparse -> [Lorg/h2/value/Value;: 8.27%
+//     // [Lorg/h2/value/VersionedValue; -> org/h2/mvstore/tx/VersionedValueUncommitted: 6.21%
+//     // [Lorg/h2/mvstore/tx/Record; -> org/h2/mvstore/tx/Record: 6.17%
+//     // [Ljava/lang/Long; -> java/lang/Long: 5.87%
+//     // [Ljava/lang/Object; -> [Lorg/h2/value/Value;: 5.83%
+//     // org/h2/mvstore/Page$Leaf -> [Lorg/h2/result/SearchRow;: 5.60%
+//     // [Lorg/h2/result/SearchRow; -> org/h2/result/Sparse: 5.34%
+//     // org/h2/mvstore/tx/Record -> org/h2/result/Sparse: 4.89%
+//     // org/h2/mvstore/Page$PageReference -> org/h2/mvstore/Page$Leaf: 4.83%
+//     // [Lorg/h2/mvstore/Page$PageReference; -> org/h2/mvstore/Page$PageReference: 3.23%
+//     // [Lorg/h2/value/VersionedValue; -> org/h2/result/DefaultRow: 2.28%
+//     // org/h2/mvstore/Page$Leaf -> [Ljava/lang/Long;: 2.06%
+//     // org/h2/mvstore/RootReference -> org/h2/mvstore/Page$NonLeaf: 0.00%, weight: 40401, count: 4489
+//     Symbol* page_leaf = SymbolTable::new_symbol("org/h2/mvstore/Page$Leaf");
+//     Symbol* default_row = SymbolTable::new_symbol("org/h2/result/DefaultRow");
+//     Symbol* sparse = SymbolTable::new_symbol("org/h2/result/Sparse");
+//     Symbol* versioned_value_uncommitted = SymbolTable::new_symbol("org/h2/mvstore/tx/VersionedValueUncommitted");
+//     Symbol* record = SymbolTable::new_symbol("org/h2/mvstore/tx/Record");
+//     Symbol* l_long = SymbolTable::new_symbol("[Ljava/lang/Long;");
+//     Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
+//     Symbol* search_row_array = SymbolTable::new_symbol("[Lorg/h2/result/SearchRow;");
+//     Symbol* page_reference = SymbolTable::new_symbol("org/h2/mvstore/Page$PageReference");
+//     Symbol* page_non_leaf = SymbolTable::new_symbol("org/h2/mvstore/Page$NonLeaf");
+//     Symbol* root_reference = SymbolTable::new_symbol("org/h2/mvstore/RootReference");
+//     Symbol* page_reference_array = SymbolTable::new_symbol("[Lorg/h2/mvstore/Page$PageReference;");
+//     Symbol* simple_row_value = SymbolTable::new_symbol("org/h2/result/SimpleRowValue");
+
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(root_reference);
+//     data_structure->add_edge(root_reference, page_non_leaf);
+//     data_structure->add_edge(page_non_leaf, page_reference_array);
+//     data_structure->add_edge(page_reference_array, page_reference);
+//     data_structure->add_edge(page_reference, page_leaf);
+//     data_structure->add_edge(page_reference, page_non_leaf);
+
+//     data_structure->add_edge(page_non_leaf, search_row_array);
+//     data_structure->add_edge(page_leaf, search_row_array);
+
+    
+//     data_structure->add_edge(search_row_array, sparse);
+//     data_structure->add_edge(search_row_array, simple_row_value);
+
+//     // org/h2/result/Sparse -> [Lorg/h2/value/Value;: 8.27%, weight: 315003847, count: 65001552
+//     Symbol* value_array = SymbolTable::new_symbol("[Lorg/h2/value/Value;");
+//     data_structure->add_edge(sparse, value_array);
+
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueNumeric: 1.32%, weight: 50350644, count: 12587661
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueInteger: 0.80%, weight: 30450760, count: 15225380
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueBigint: 0.62%, weight: 23471262, count: 7823754
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueVarchar: 0.39%, weight: 15045404, count: 3761351
+//     // org/h2/value/ValueVarchar -> java/lang/String: 0.32%, weight: 12316976, count: 3079244
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueChar: 0.22%, weight: 8433632, count: 2108408
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueSmallint: 0.21%, weight: 7857526, count: 3928763
+//     // org/h2/value/ValueChar -> java/lang/String: 0.15%, weight: 5682696, count: 1420674
+//     // [Lorg/h2/value/Value; -> org/h2/value/ValueTimestamp: 0.09%, weight: 3439008, count: 859752
+
+//     Symbol* value_numeric = SymbolTable::new_symbol("org/h2/value/ValueNumeric");
+//     Symbol* value_integer = SymbolTable::new_symbol("org/h2/value/ValueInteger");
+//     Symbol* value_bigint = SymbolTable::new_symbol("org/h2/value/ValueBigint");
+//     Symbol* value_varchar = SymbolTable::new_symbol("org/h2/value/ValueVarchar");
+//     Symbol* value_char = SymbolTable::new_symbol("org/h2/value/ValueChar");
+//     Symbol* value_smallint = SymbolTable::new_symbol("org/h2/value/ValueSmallint");
+//     Symbol* value_timestamp = SymbolTable::new_symbol("org/h2/value/ValueTimestamp");
+//     Symbol* string = SymbolTable::new_symbol("java/lang/String");
+
+//     data_structure->add_edge(value_array, value_numeric);
+//     data_structure->add_edge(value_array, value_integer);
+//     data_structure->add_edge(value_array, value_bigint);
+//     data_structure->add_edge(value_array, value_varchar);
+//     data_structure->add_edge(value_array, value_char);
+//     data_structure->add_edge(value_array, value_smallint);
+//     data_structure->add_edge(value_array, value_timestamp);
+
+//     // org/h2/value/ValueNumeric -> java/math/BigDecimal: 1.84%, weight: 70053168, count: 11675528
+//     // org/h2/value/ValueChar -> java/lang/String: 0.15%, weight: 5682696, count: 1420674
+//     // org/h2/value/ValueVarchar -> java/lang/String: 0.55%, weight: 12316976, count: 3079244
+
+//     Symbol* big_decimal = SymbolTable::new_symbol("java/math/BigDecimal");
+//     data_structure->add_edge(value_numeric, big_decimal);
+//     data_structure->add_edge(value_char, string);
+//     data_structure->add_edge(value_varchar, string);
+
+//     Symbol* byte_array = SymbolTable::new_symbol("[B");
+//     data_structure->add_edge(string, byte_array);
+
+//     // org/h2/result/SimpleRowValue -> org/h2/value/ValueInteger: 0.00%, weight: 44090, count: 22045
+//     data_structure->add_edge(simple_row_value, value_integer);
+
+//     Symbol* record_array = SymbolTable::new_symbol("[Lorg/h2/mvstore/tx/Record;");
+//     Symbol* long_array = SymbolTable::new_symbol("[Ljava/lang/Long;");
+//     Symbol* long_obj = SymbolTable::new_symbol("java/lang/Long");
+//     data_structure->add_edge(page_leaf, record_array);
+//     data_structure->add_edge(page_leaf, long_array);
+//     data_structure->add_edge(long_array, long_obj);
+
+//     // org/h2/mvstore/Page$Leaf -> [Lorg/h2/value/VersionedValue;: 3.88%, weight: 615382000, count: 21803205
+//     Symbol* versioned_value_array = SymbolTable::new_symbol("[Lorg/h2/value/VersionedValue;");
+//     data_structure->add_edge(page_leaf, versioned_value_array);
+//     data_structure->add_edge(versioned_value_array, versioned_value_uncommitted);
+//     data_structure->add_edge(versioned_value_array, default_row);
+
+//     data_structure->add_edge(default_row, value_array);
+
+//     data_structure->add_edge(record_array, record);
+//     data_structure->add_edge(record, sparse);
+//     data_structure->add_edge(record, long_obj);
+//     data_structure->add_edge(record, versioned_value_uncommitted);
+//     data_structure->add_edge(record, simple_row_value);
+
+
+
+//     _data_structure_types.add(data_structure);
+
+
+
+// }
+
+void G1DataStructureManager::initialize_predefined_data_structures() {
+
+    // java/nio/HeapByteBuffer -> [B : weight_factor: 36.50% size_factor: 0.36499393036008876 weight: 1641539726, count: 24002
+    // org/apache/cassandra/db/rows/BufferCell -> java/nio/HeapByteBuffer : weight_factor: 90.24% size_factor: 0.3293804708265296 weight: 1017215136, count: 127151892
+    // [Ljava/lang/Object; -> org/apache/cassandra/db/rows/BufferCell : weight_factor: 100.00% size_factor: 0.3293804708265296 weight: 890089193, count: 127155599
+    // org/apache/cassandra/db/partitions/BTreePartitionData -> [Ljava/lang/Object; : weight_factor: 19.24% size_factor: 0.06337376136688198 weight: 42225579, count: 14075193
+    // org/apache/cassandra/db/rows/BTreeRow -> [Ljava/lang/Object; : weight_factor: 77.71% size_factor: 0.25595970092397613 weight: 170544502, count: 14075802
+    // org/apache/cassandra/db/partitions/AtomicBTreePartition -> org/apache/cassandra/db/partitions/BTreePartitionData : weight_factor: 100.00% size_factor: 0.06337068166005362 weight: 98521983, count: 14074569
+    // [Ljava/lang/Object; -> org/apache/cassandra/db/rows/BTreeRow : weight_factor: 100.00% size_factor: 0.25595940997401456 weight: 98530530, count: 14075790
+    // java/util/concurrent/ConcurrentSkipListMap$Node -> org/apache/cassandra/db/partitions/AtomicBTreePartition : weight_factor: 100.00% size_factor: 0.06337068166005362 weight: 81834102, count: 13639017
+    // java/util/concurrent/ConcurrentSkipListMap$Node -> java/util/concurrent/ConcurrentSkipListMap$Node : weight_factor: 86.38% size_factor: 0.05474268389025206 weight: 59450900, count: 11890180
+    // java/util/concurrent/ConcurrentSkipListMap$Index -> java/util/concurrent/ConcurrentSkipListMap$Node: 0.21%, weight: 9369905, count: 1873981
+    // java/util/concurrent/ConcurrentSkipListMap$Index -> java/util/concurrent/ConcurrentSkipListMap$Index: 1.63%, weight: 34335245, count: 6867049
+    // [Ljava/lang/Object; -> java/util/concurrent/ConcurrentSkipListMap$Index: 0.00%, weight: 615, count: 123
+    // java/util/concurrent/ConcurrentSkipListMap -> java/util/concurrent/ConcurrentSkipListMap$Index: 0.00%, weight: 580, count: 116
+
+
+    Symbol* skip_list_map = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap");
+    Symbol* skip_list_index = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Index");
+    Symbol* skip_list_node = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Node");
+    Symbol* btree_partition = SymbolTable::new_symbol("org/apache/cassandra/db/partitions/AtomicBTreePartition");
+    Symbol* btree_partition_data = SymbolTable::new_symbol("org/apache/cassandra/db/partitions/BTreePartitionData");
+    Symbol* l_object = SymbolTable::new_symbol("[Ljava/lang/Object;");
+    Symbol* btree_row = SymbolTable::new_symbol("org/apache/cassandra/db/rows/BTreeRow");
+    Symbol* buffer_cell = SymbolTable::new_symbol("org/apache/cassandra/db/rows/BufferCell");
+    Symbol* heap_byte_buffer = SymbolTable::new_symbol("java/nio/HeapByteBuffer");
+    Symbol* column_metadata = SymbolTable::new_symbol("org/apache/cassandra/schema/ColumnMetadata");
+    Symbol* l_byte = SymbolTable::new_symbol("[B");
+
+    G1DataStructure* data_structure = new G1DataStructure();
+    data_structure->add_root(skip_list_map);
+    data_structure->add_root(skip_list_index);
+    data_structure->add_edge(skip_list_map, skip_list_index);
+    data_structure->add_edge(skip_list_index, skip_list_index);
+    data_structure->add_edge(skip_list_index, skip_list_node);
+    data_structure->add_edge(skip_list_node, skip_list_node);
+    data_structure->add_edge(skip_list_node, btree_partition);
+    data_structure->add_edge(btree_partition, btree_partition_data);
+    data_structure->add_edge(btree_partition_data, l_object);
+    data_structure->add_edge(l_object, btree_row);
+    data_structure->add_edge(btree_row, l_object);
+    data_structure->add_edge(l_object, buffer_cell);
+    data_structure->add_edge(buffer_cell, heap_byte_buffer);
+    data_structure->add_edge(heap_byte_buffer, l_byte);
+
+    data_structure->add_edge(buffer_cell, column_metadata);
+
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/BufferDecoratedKey, from obj 0x7f74214030b0, from klass java/util/concurrent/ConcurrentSkipListMap$Node, region young 7633
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/BufferDecoratedKey, from obj 0x7f74214030d8, from klass org/apache/cassandra/db/partitions/AtomicBTreePartition, region young 7633
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/utils/memory/SlabAllocator, from obj 0x7f74214030d8, from klass org/apache/cassandra/db/partitions/AtomicBTreePartition, region old 2964
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/schema/TableMetadataRef, from obj 0x7f74214030d8, from klass org/apache/cassandra/db/partitions/AtomicBTreePartition, region old 8
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/RegularAndStaticColumns, from obj 0x7f7421403108, from klass org/apache/cassandra/db/partitions/BTreePartitionData, region old 229
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/MutableDeletionInfo, from obj 0x7f7421403108, from klass org/apache/cassandra/db/partitions/BTreePartitionData, region old 9
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/rows/BTreeRow, from obj 0x7f7421403108, from klass org/apache/cassandra/db/partitions/BTreePartitionData, region old 227
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/rows/EncodingStats, from obj 0x7f7421403108, from klass org/apache/cassandra/db/partitions/BTreePartitionData, region young 7633
+    // [2025-08-02T16:10:53.895+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/Clustering$2, from obj 0x7f7421403158, from klass org/apache/cassandra/db/rows/BTreeRow, region old 227
+    // [2025-08-02T16:10:53.896+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/LivenessInfo, from obj 0x7f7421403158, from klass org/apache/cassandra/db/rows/BTreeRow, region young 7633
+    // [2025-08-02T16:10:53.896+0800][84.859s][41485][info][gc               ] GC(35) out obj, klass org/apache/cassandra/db/rows/Row$Deletion, from obj 0x7f7421403158, from klass org/apache/cassandra/db/rows/BTreeRow, region old 227
+
+    Symbol* buffer_decorator_key = SymbolTable::new_symbol("org/apache/cassandra/db/BufferDecoratedKey");
+    Symbol* slab_allocator = SymbolTable::new_symbol("org/apache/cassandra/utils/memory/SlabAllocator");
+    Symbol* table_metadata_ref = SymbolTable::new_symbol("org/apache/cassandra/schema/TableMetadataRef");
+    Symbol* regular_and_static_columns = SymbolTable::new_symbol("org/apache/cassandra/db/RegularAndStaticColumns");
+    Symbol* mutable_deletion_info = SymbolTable::new_symbol("org/apache/cassandra/db/MutableDeletionInfo");
+    Symbol* encoding_stats = SymbolTable::new_symbol("org/apache/cassandra/db/rows/EncodingStats");
+    Symbol* clustering_2 = SymbolTable::new_symbol("org/apache/cassandra/db/Clustering$2");
+    Symbol* liveness_info = SymbolTable::new_symbol("org/apache/cassandra/db/LivenessInfo");
+    Symbol* row_deletion = SymbolTable::new_symbol("org/apache/cassandra/db/rows/Row$Deletion");
+
+
+    data_structure->add_edge(skip_list_node, buffer_decorator_key);
+    data_structure->add_edge(btree_partition, buffer_decorator_key);
+    data_structure->add_edge(btree_partition, slab_allocator);
+    data_structure->add_edge(btree_partition, table_metadata_ref);
+    data_structure->add_edge(btree_partition_data, regular_and_static_columns);
+    data_structure->add_edge(btree_partition_data, mutable_deletion_info);
+    data_structure->add_edge(btree_partition_data, btree_row);
+    data_structure->add_edge(btree_partition_data, encoding_stats);
+    data_structure->add_edge(btree_row, clustering_2);
+    data_structure->add_edge(btree_row, liveness_info);
+    data_structure->add_edge(btree_row, row_deletion);
+
+    _data_structure_types.add(data_structure);
+    
+}
 
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
@@ -690,16 +913,16 @@ bool G1DataStructureManager::is_retained_old_region(HeapRegion* hr) {
     
 // }
 
-void G1DataStructureManager::initialize_predefined_data_structures() {
-    Symbol* tree_node = SymbolTable::new_symbol("smile/clustering/BBDTree$Node");
-    Symbol* l_d = SymbolTable::new_symbol("[D");
-    G1DataStructure* data_structure = new G1DataStructure();
-    data_structure->add_root(tree_node);
-    data_structure->add_edge(tree_node, tree_node);
-    data_structure->add_edge(tree_node, l_d);
+// void G1DataStructureManager::initialize_predefined_data_structures() {
+//     Symbol* tree_node = SymbolTable::new_symbol("smile/clustering/BBDTree$Node");
+//     Symbol* l_d = SymbolTable::new_symbol("[D");
+//     G1DataStructure* data_structure = new G1DataStructure();
+//     data_structure->add_root(tree_node);
+//     data_structure->add_edge(tree_node, tree_node);
+//     data_structure->add_edge(tree_node, l_d);
 
-    _data_structure_types.add(data_structure);
-}
+//     _data_structure_types.add(data_structure);
+// }
 
 // void G1DataStructureManager::initialize_predefined_data_structures() {
 //     Symbol* l_tuple3 = SymbolTable::new_symbol("[Lscala/Tuple3;");

@@ -364,6 +364,7 @@ void G1ConcurrentMarkThread::concurrent_mark_cycle_do() {
   if(G1LogRemset){
     // g1h->rem_set()->log_remset();
     // g1h->print_region_types();
+    g1h->print_region_types_summary();
   }
   g1h->policy()->note_finish_conc();
 

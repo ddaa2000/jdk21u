@@ -202,6 +202,9 @@ public:
         if(_alloc_region.get() != nullptr){
             ShouldNotReachHere();
         }
+        if(_retained_old_region != nullptr){
+            log_info(gc)("abandon retained region %u, remaining size %lf", _retained_old_region->hrm_index(), _retained_old_region->free() * 1.0 / HeapRegion::GrainBytes);
+        }
         _retained_old_region = nullptr;
     }
 

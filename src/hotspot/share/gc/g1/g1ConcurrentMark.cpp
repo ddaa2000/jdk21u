@@ -977,6 +977,7 @@ void G1ConcurrentMark::scan_root_regions() {
   if(G1LogRemset){
     // _g1h->rem_set()->log_remset();
     // _g1h->print_region_types();
+    _g1h->print_region_types_summary();
   }
 
   if (root_regions()->scan_in_progress()) {
@@ -1280,7 +1281,7 @@ void G1ConcurrentMark::remark() {
 
   verify_during_pause(G1HeapVerifier::G1VerifyRemark, VerifyLocation::RemarkBefore);
 
-  _g1h->allocator()->abandon_gc_alloc_regions();
+  // _g1h->allocator()->abandon_gc_alloc_regions();
 
   if(!should_do_detailed_concurrent_gc()){
 
@@ -2045,11 +2046,17 @@ public:
     //   PushLiveDataStructures cl(worker_id, _active_workers, task);
     //   g1h->data_structure_manager()->data_structures_instances_iterate(&cl);
     // }
+    
 
     do {
+      // log_info(gc)("worker %u: do remark ds start", worker_id);
       task->do_marking_step(1000000000.0 /* something very large */,
                             true         /* do_termination       */,
                             false        /* is_serial            */);
+      // log_info(gc)("worker %u: do remark ds end", worker_id);
+      if(task->has_aborted()) {
+        // log_info(gc)("worker %u: remark ds aborted", worker_id);
+      }
     } while (task->has_aborted() && !_cm->has_overflown());
     // If we overflow, then we do not want to restart. We instead
     // want to abort remark and do concurrent marking again.
@@ -2908,6 +2915,7 @@ void G1CMTask::do_marking_step(double time_target_ms,
   drain_local_queue(true);
   drain_global_stack(true);
 
+  // log_info(gc)("worker %u start iterate regions", worker_id());
   do {
     if (!has_aborted() && _curr_region != nullptr) {
       // This means that we're already holding on to a region.
@@ -3021,6 +3029,9 @@ void G1CMTask::do_marking_step(double time_target_ms,
              "at this point we should be out of regions");
     }
   } while ( _curr_region != nullptr && !has_aborted());
+  // log_info(gc)("worker %u end iterate regions", worker_id());
+
+
 
   if (!has_aborted()) {
     // We cannot check whether the global stack is empty, since other
@@ -3039,6 +3050,8 @@ void G1CMTask::do_marking_step(double time_target_ms,
 
   // Attempt at work stealing from other task's queues.
   if (do_stealing && !has_aborted()) {
+    // log_info(gc)("worker %u start stealing", worker_id());
+
     // We have not aborted. This means that we have finished all that
     // we could. Let's try to do some stealing...
 
@@ -3059,6 +3072,8 @@ void G1CMTask::do_marking_step(double time_target_ms,
         break;
       }
     }
+
+    // log_info(gc)("worker %u stop stealing", worker_id());
   }
 
   // We still haven't aborted. Now, let's try to get into the

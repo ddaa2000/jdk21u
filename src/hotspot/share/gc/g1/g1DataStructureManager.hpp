@@ -61,7 +61,7 @@ public:
         _allocator(nullptr), _evacuation_info(nullptr), _data_structures_lock(Mutex::nosafepoint, "data_structures lock") {}
     
     void check_add_humongous(oop from_oop, oop to_oop);
-    G1DataStructureRegionSet* get_data_structure(oop from_oop, oop to_oop);
+    G1DataStructureRegionSet* get_data_structure(oop from_oop, oop to_oop, bool &newly_created);
     void init_data_structure_alloc_regions(G1Allocator* allocator, G1EvacInfo* evacuation_info);
     void release_data_structure_alloc_regions();
     void abandon_data_structure_alloc_regions();

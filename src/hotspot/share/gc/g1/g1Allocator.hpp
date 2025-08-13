@@ -220,7 +220,7 @@ private:
   // inline PLAB* alloc_buffer(region_type_t dest, uint node_index) const;
   inline PLAB* alloc_buffer(G1HeapRegionAttr dest, uint node_index, G1DataStructureRegionSet* data_structure) const;
   inline PLAB* alloc_buffer(region_type_t dest, uint node_index, G1DataStructureRegionSet* data_structure) const;
-  inline G1DataStructureRegionSet* data_structure_region_set(oop from_oop, oop to_oop) const;
+  inline G1DataStructureRegionSet* data_structure_region_set(oop from_oop, oop to_oop, bool &newly_created) const;
 
   // Returns the number of allocation buffers for the given dest.
   // There is only 1 buffer for Old while Young may have multiple buffers depending on
