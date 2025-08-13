@@ -278,10 +278,35 @@ bool G1ConcurrentMarkThread::phase_cleanup() {
   return _cm->has_aborted();
 }
 
+class G1TraceWSSClosure : public HeapRegionClosure {
+private:
+  size_t _traced_size;
+public:
+  G1TraceWSSClosure() : HeapRegionClosure(), _traced_size(0) {}
+
+  virtual bool do_heap_region(HeapRegion* r) {
+    _traced_size += r->get_traced_page_size();
+    r->clear_traced();
+    return false;
+  }
+
+  size_t traced_size() const {
+    return _traced_size;
+  }
+};
+
 bool G1ConcurrentMarkThread::phase_clear_bitmap_for_next_mark() {
   ConcurrentGCBreakpoints::at("AFTER CLEANUP STARTED");
   G1ConcPhaseTimer p(_cm, "Concurrent Cleanup for Next Mark");
   _cm->cleanup_for_next_mark();
+
+  if(RecordTraceWSS){
+    G1TraceWSSClosure cl;
+    G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    g1h->heap_region_iterate(&cl);
+    log_info(gc)("traced size: %.2lf", cl.traced_size() / 1024.0 / 1024 / 1024);
+  }
+
   return _cm->has_aborted();
 }
 

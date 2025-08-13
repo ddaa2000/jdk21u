@@ -373,7 +373,7 @@ size_t G1GCAllocRegion::retire(bool fill_up) {
     // }
     g1h->add_size_copied(total_copied);
   }
-  
+
   // Do not count retirement of the dummy allocation region.
   if (retired != nullptr) {
     _stats->add_region_end_waste(end_waste / HeapWordSize);

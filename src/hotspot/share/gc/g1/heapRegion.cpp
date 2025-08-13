@@ -245,12 +245,18 @@ HeapRegion::HeapRegion(uint hrm_index,
   _node_index(G1NUMA::UnknownNodeIndex),
   _data_structure_region_set(nullptr),
   _region_alive(false),
-  _collect_as_a_whole(false)
+  _collect_as_a_whole(false),
+  _traced(nullptr)
 {
   assert(Universe::on_page_boundary(mr.start()) && Universe::on_page_boundary(mr.end()),
          "invalid space boundaries");
   // log_info(gc)("new region %u", hrm_index);
   _rem_set = new HeapRegionRemSet(this, config);
+  _traced = NEW_C_HEAP_ARRAY(bool, HeapRegion::GrainBytes / (4* 1024), mtGC);
+  // log_info(gc)("heap trace size %lu", HeapRegion::GrainBytes / (4* 1024));
+  for (size_t i = 0; i < HeapRegion::GrainBytes / (4 * 1024); i++) {
+    _traced[i] = false;
+  }
   initialize();
 }
 

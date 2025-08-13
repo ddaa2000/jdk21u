@@ -1393,7 +1393,7 @@ public:
     _size_copied += size;
   }
 
-  size_t get_size_copied() const {  
+  size_t get_size_copied() const {
     return _size_copied;
   }
 };

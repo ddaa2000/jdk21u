@@ -442,7 +442,7 @@ public:
 
   void set_rem_set(HeapRegionRemSet* rem_set) {
     log_info(gc)("set remset %u", hrm_index());
-    _rem_set = rem_set; 
+    _rem_set = rem_set;
   }
   // If the region has a remembered set, return a pointer to it.
   HeapRegionRemSet* rem_set() const {
@@ -615,6 +615,33 @@ public:
   inline bool collect_as_a_whole(){
     return _collect_as_a_whole;
   }
+
+private:
+    bool* _traced;
+
+public:
+    void record_traced(HeapWord* addr) {
+      if((size_t)(addr - bottom()) > HeapRegion::GrainWords || addr < bottom()){
+        ShouldNotReachHere();
+      }
+      _traced[((addr - bottom()) << LogHeapWordSize) / (4 * 1024)] = true;
+    }
+
+    void clear_traced() {
+      for (size_t i = 0; i < HeapRegion::GrainBytes / (4 * 1024); i++) {
+        _traced[i] = false;
+      }
+    }
+
+    size_t get_traced_page_size() const {
+      size_t traced_size = 0;
+      for (size_t i = 0; i < HeapRegion::GrainBytes / (4 * 1024); i++) {
+        if (_traced[i]) {
+          traced_size += 4 * 1024;
+        }
+      }
+      return traced_size;
+    }
 };
 
 // HeapRegionClosure is used for iterating over regions.

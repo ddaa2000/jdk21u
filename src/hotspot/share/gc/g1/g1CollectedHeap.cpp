@@ -1284,7 +1284,7 @@ G1CollectedHeap::G1CollectedHeap() :
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
   _region_attr(),
-  _size_copied() {
+  _size_copied(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -2519,6 +2519,7 @@ bool G1CollectedHeap::do_collection_pause_at_safepoint() {
   if (GCLocker::check_active_before_gc()) {
     return false;
   }
+
   do_collection_pause_at_safepoint_helper();
   return true;
 }

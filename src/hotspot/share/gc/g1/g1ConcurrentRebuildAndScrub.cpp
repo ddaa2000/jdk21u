@@ -77,7 +77,7 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
     G1VerifyDataStructureRefClosure(G1CollectedHeap* g1h, G1ConcurrentMark* cm, uint worker_id) :
       ClaimMetadataVisitingOopIterateClosure(0),
       _g1h(g1h), _cm(cm), _bitmap(_cm->mark_bitmap()), _worker_id(worker_id), _from_oop(nullptr) { }
-    
+
     template <class T>
     inline void do_oop_work(T* p) {
       oop obj = RawAccess<MO_RELAXED>::oop_load(p);
@@ -95,7 +95,7 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
       HeapWord* const pb = hr->parsable_bottom_acquire();
       if(hr->data_structure() == nullptr){
         if(!_bitmap->is_marked(obj) && cast_from_oop<HeapWord*>(obj) < pb){
-          log_info(gc)("obj not alive, from hr %u to hr %u, pointer %p", 
+          log_info(gc)("obj not alive, from hr %u to hr %u, pointer %p",
                        from_hr->hrm_index(), hr->hrm_index(), p);
           if(from_hr->data_structure() != nullptr){
             from_hr->data_structure()->find_out_card((HeapWord*)p);
@@ -204,6 +204,11 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
     size_t scan_object(HeapRegion* hr, HeapWord* current) {
       oop obj = cast_to_oop(current);
       size_t obj_size = obj->size();
+      if(RecordTraceWSS){
+        G1CollectedHeap* g1h = G1CollectedHeap::heap();
+        // HeapRegion* const hr = g1h->heap_region_containing(obj);
+        hr->record_traced((HeapWord*)obj);
+      }
 
       if (!_should_rebuild_remset) {
         // Not rebuilding, just step to next object.
@@ -238,7 +243,9 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
 
       HeapWord* scrub_end = _bitmap->get_next_marked_addr(scrub_start, limit);
       hr->fill_range_with_dead_objects(scrub_start, scrub_end);
-      // log_info(gc)("scrub %p to %p", scrub_start, scrub_end);
+      if(RecordTraceWSS){
+        hr->record_traced((HeapWord*)scrub_start);
+      }
 
       // Return the next object to handle.
       return scrub_end;
