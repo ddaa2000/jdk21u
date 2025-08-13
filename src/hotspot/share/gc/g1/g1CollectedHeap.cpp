@@ -1273,7 +1273,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _ref_processor_cm(nullptr),
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
-  _region_attr() {
+  _region_attr(),
+  _size_copied(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1541,6 +1542,7 @@ void G1CollectedHeap::stop() {
   // Stop all concurrent threads. We do this to make sure these threads
   // do not continue to execute and access resources (e.g. logging)
   // that are destroyed during shutdown.
+  log_info(gc)("size copied: %lu", _size_copied);
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();

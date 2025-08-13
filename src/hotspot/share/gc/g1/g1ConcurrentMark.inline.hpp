@@ -170,6 +170,12 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       _words_scanned += _objArray_processor.process_slice(task_entry.slice());
     } else {
       oop obj = task_entry.obj();
+      if(RecordTraceWSS){
+        HeapRegion* const hr = _g1h->heap_region_containing_or_null(obj);
+        if(hr != nullptr){
+          hr->record_traced((HeapWord*)obj);
+        }
+      }
       if (G1CMObjArrayProcessor::should_be_sliced(obj)) {
         _words_scanned += _objArray_processor.process_obj(obj);
       } else {
@@ -267,6 +273,15 @@ inline bool G1CMTask::deal_with_reference(T* p) {
   oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
   if (obj == nullptr) {
     return false;
+  }
+  if(RecordTraceWSS){
+    if(_g1h->is_in_reserved(p)) {
+      // log_info(gc)("p is %p", p);
+      HeapRegion* const hr = _g1h->heap_region_containing_or_null((void*)p); 
+      if(hr != nullptr){
+        hr->record_traced((HeapWord*)p);
+      }
+    }
   }
   return make_reference_grey(obj);
 }

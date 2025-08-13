@@ -141,6 +141,11 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
     size_t scan_object(HeapRegion* hr, HeapWord* current) {
       oop obj = cast_to_oop(current);
       size_t obj_size = obj->size();
+      if(RecordTraceWSS){
+        G1CollectedHeap* g1h = G1CollectedHeap::heap();
+        // HeapRegion* const hr = g1h->heap_region_containing(obj);
+        hr->record_traced((HeapWord*)obj);
+      }
 
       if (!_should_rebuild_remset) {
         // Not rebuilding, just step to next object.
@@ -169,6 +174,9 @@ class G1RebuildRSAndScrubTask : public WorkerTask {
 
       HeapWord* scrub_end = _bitmap->get_next_marked_addr(scrub_start, limit);
       hr->fill_range_with_dead_objects(scrub_start, scrub_end);
+      if(RecordTraceWSS){
+        hr->record_traced((HeapWord*)scrub_start);
+      }
 
       // Return the next object to handle.
       return scrub_end;

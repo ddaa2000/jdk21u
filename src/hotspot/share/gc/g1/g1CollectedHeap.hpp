@@ -1313,6 +1313,17 @@ public:
 
   // Used to print information about locations in the hs_err file.
   bool print_location(outputStream* st, void* addr) const override;
+
+private:
+  size_t _size_copied;
+public:
+  void add_size_copied(size_t size) {
+    _size_copied += size;
+  }
+
+  size_t get_size_copied() const {  
+    return _size_copied;
+  }
 };
 
 // Scoped object that performs common pre- and post-gc heap printing operations.

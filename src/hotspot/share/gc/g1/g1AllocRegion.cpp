@@ -358,6 +358,13 @@ void G1GCAllocRegion::retire_region(HeapRegion* alloc_region,
 size_t G1GCAllocRegion::retire(bool fill_up) {
   HeapRegion* retired = get();
   size_t end_waste = G1AllocRegion::retire(fill_up);
+
+  if(fill_up){
+    size_t total_copied = HeapRegion::GrainBytes - end_waste;
+    G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    g1h->add_size_copied(total_copied);
+  }
+
   // Do not count retirement of the dummy allocation region.
   if (retired != nullptr) {
     _stats->add_region_end_waste(end_waste / HeapWordSize);
