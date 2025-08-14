@@ -304,7 +304,7 @@ bool G1ConcurrentMarkThread::phase_clear_bitmap_for_next_mark() {
     G1TraceWSSClosure cl;
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
     g1h->heap_region_iterate(&cl);
-    log_info(gc)("traced size: %.2lf", cl.traced_size() / 1024.0 / 1024 / 1024);
+    log_info(gc)("traced size: %.9lf", cl.traced_size() / 1024.0 / 1024 / 1024);
   }
 
   return _cm->has_aborted();

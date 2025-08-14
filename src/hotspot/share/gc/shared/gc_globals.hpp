@@ -537,7 +537,10 @@
           "2: Detailed verification by forcing a GC (with side effects)")   \
           range(0, 2)                                                       \
                                                                             \
-  product(ccstrlist, VerifyGCType, "", DIAGNOSTIC,                          \
+  product(ccstrlist, VerifyGCType, "",                                      \
+             "GC type(s) to verify when Verify*GC is enabled."              \
+             "Available types are collector specific.")                     \
+  product(ccstrlist, DataBench, "",                                         \
              "GC type(s) to verify when Verify*GC is enabled."              \
              "Available types are collector specific.")                     \
                                                                             \

@@ -511,30 +511,32 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   // }
 
-  // G1DataStructureRegionSet* target_data_structure = nullptr;
-  // target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old);
+  bool newly_created = false;
 
-  // if(target_data_structure != nullptr){
-  //   dest_attr = G1HeapRegionAttr::Old;
-  // } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
-  //   dest_attr = region_attr;
-  // } else {
-  //   dest_attr = next_region_attr(region_attr, old_mark, age);
-  // }
+  G1DataStructureRegionSet* target_data_structure = nullptr;
+  target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old, newly_created);
+
+  if(target_data_structure != nullptr){
+    dest_attr = G1HeapRegionAttr::Old;
+  } else if(from_obj_region != nullptr && from_obj_region->is_young()) {
+    dest_attr = region_attr;
+  } else {
+    dest_attr = next_region_attr(region_attr, old_mark, age);
+  }
 
 
   // static Symbol* skip_list_index = SymbolTable::new_symbol("java/util/concurrent/ConcurrentSkipListMap$Index");
 
 
-  if(from_obj_region != nullptr && from_obj_region->is_young()) {
-    dest_attr = region_attr;
-  } 
-  // else if (klass->name() == skip_list_index && (from_obj_region==nullptr || from_obj_region->data_structure() == nullptr)) {
+  // if(from_obj_region != nullptr && from_obj_region->is_young()) {
   //   dest_attr = region_attr;
   // } 
-  else {
-    dest_attr = next_region_attr(region_attr, old_mark, age);
-  }
+  // // else if (klass->name() == skip_list_index && (from_obj_region==nullptr || from_obj_region->data_structure() == nullptr)) {
+  // //   dest_attr = region_attr;
+  // // } 
+  // else {
+  //   dest_attr = next_region_attr(region_attr, old_mark, age);
+  // }
 
 
   // dest_attr = next_region_attr(region_attr, old_mark, age);
@@ -555,28 +557,28 @@ oop G1ParScanThreadState::do_copy_to_survivor_space(G1HeapRegionAttr const regio
   
   // static Symbol* l_double = SymbolTable::new_symbol("[D");
   
-  G1DataStructureRegionSet* target_data_structure = nullptr;
-  // bool special_mark = false;
-  if(dest_attr.is_old()){
-    bool newly_created = false;
-    target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old, newly_created);
-    // if(newly_created && target_data_structure != nullptr){
-    //   log_info(gc)("newly created %s", dest_attr.get_type_str());
-    // }
-    // if(target_data_structure == nullptr && old->klass()->name() == tuple2_array) {
-    //   if(from_obj != nullptr) {
-    //       log_info(gc)("not found tuple2, from class %s, from region %u, from region type %s, from region ds %s",
-    //                    from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
-    //                    _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
-    //                    _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
-    //   } else {
-    //       log_info(gc)("not found tuple2, from class null, from region null, from region type null");
-    //   }
-    // } 
-    // else if(target_data_structure != nullptr && old->klass()->name() == l_double){
-    //   special_mark = true;
-    // }
-  }
+  // G1DataStructureRegionSet* target_data_structure = nullptr;
+  // // bool special_mark = false;
+  // if(dest_attr.is_old()){
+  //   bool newly_created = false;
+  //   target_data_structure = _plab_allocator->data_structure_region_set(from_obj, old, newly_created);
+  //   // if(newly_created && target_data_structure != nullptr){
+  //   //   log_info(gc)("newly created %s", dest_attr.get_type_str());
+  //   // }
+  //   // if(target_data_structure == nullptr && old->klass()->name() == tuple2_array) {
+  //   //   if(from_obj != nullptr) {
+  //   //       log_info(gc)("not found tuple2, from class %s, from region %u, from region type %s, from region ds %s",
+  //   //                    from_obj->klass()->name()->as_C_string(), _g1h->heap_region_containing(from_obj)->hrm_index(),
+  //   //                    _g1h->heap_region_containing(from_obj)->is_humongous() ? "humongous" : "normal",
+  //   //                    _g1h->heap_region_containing(from_obj)->data_structure() != nullptr ? "ds" : "not ds");
+  //   //   } else {
+  //   //       log_info(gc)("not found tuple2, from class null, from region null, from region type null");
+  //   //   }
+  //   // } 
+  //   // else if(target_data_structure != nullptr && old->klass()->name() == l_double){
+  //   //   special_mark = true;
+  //   // }
+  // }
 
   // if(target_data_structure != nullptr){
   //   if(from_obj != nullptr){
