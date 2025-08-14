@@ -36,6 +36,7 @@
 #include "gc/g1/g1RemSetTrackingPolicy.hpp"
 #include "gc/g1/heapRegionRemSet.inline.hpp"
 #include "gc/g1/heapRegion.hpp"
+#include "gc/g1/g1_globals.hpp"
 #include "gc/shared/suspendibleThreadSet.hpp"
 #include "gc/shared/taskqueue.inline.hpp"
 #include "utilities/bitMap.inline.hpp"
@@ -169,6 +170,12 @@ inline void G1CMTask::process_grey_task_entry(G1TaskQueueEntry task_entry) {
       _words_scanned += _objArray_processor.process_slice(task_entry.slice());
     } else {
       oop obj = task_entry.obj();
+      if(RecordTraceWSS){
+        HeapRegion* const hr = _g1h->heap_region_containing_or_null(obj);
+        if(hr != nullptr){
+          hr->record_traced((HeapWord*)obj);
+        }
+      }
       if (G1CMObjArrayProcessor::should_be_sliced(obj)) {
         _words_scanned += _objArray_processor.process_obj(obj);
       } else {
@@ -267,6 +274,15 @@ inline bool G1CMTask::deal_with_reference(T* p) {
   if (obj == nullptr) {
     return false;
   }
+  if(RecordTraceWSS){
+    if(_g1h->is_in_reserved(p)) {
+      // log_info(gc)("p is %p", p);
+      HeapRegion* const hr = _g1h->heap_region_containing_or_null((void*)p); 
+      if(hr != nullptr){
+        hr->record_traced((HeapWord*)p);
+      }
+    }
+  }
   return make_reference_grey(obj);
 }
 
@@ -291,7 +307,7 @@ bool G1ConcurrentMark::is_marked_in_black_bitmap(oop p) const {
 }
 
 inline bool G1ConcurrentMark::do_yield_check() {
-  if (SuspendibleThreadSet::should_yield()) {
+  if (!G1UseSTWMarking && SuspendibleThreadSet::should_yield()) {
     SuspendibleThreadSet::yield();
     return true;
   } else {

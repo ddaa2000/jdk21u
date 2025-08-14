@@ -72,7 +72,8 @@ extern Monitor* CPF_lock;
 extern Monitor* CCM_finish_lock;
 
 // extern Mutex*   PREFETCH_Q_FL_lock;
-// extern Monitor* PREFETCH_Q_CBL_mon;                                                 
+// extern Monitor* PREFETCH_Q_CBL_mon;
+extern Monitor* G1MarkFinished_lock;
 extern Monitor* STS_lock;                        // used for joining/leaving SuspendibleThreadSet.
 extern Monitor* G1OldGCCount_lock;               // in support of "concurrent" full gc
 extern Mutex*   G1RareEvent_lock;                // Synchronizes (rare) parallel GC operations.

@@ -75,6 +75,7 @@
 #include "gc/g1/heapRegion.inline.hpp"
 #include "gc/g1/heapRegionRemSet.inline.hpp"
 #include "gc/g1/heapRegionSet.inline.hpp"
+#include "gc/g1/g1_globals.hpp"
 #include "gc/shared/concurrentGCBreakpoints.hpp"
 #include "gc/shared/gcBehaviours.hpp"
 #include "gc/shared/gcHeapSummary.hpp"
@@ -1286,7 +1287,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _ref_processor_cm(nullptr),
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
-  _region_attr() {
+  _region_attr(),
+  _size_copied(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1624,6 +1626,7 @@ void G1CollectedHeap::stop() {
   // Stop all concurrent threads. We do this to make sure these threads
   // do not continue to execute and access resources (e.g. logging)
   // that are destroyed during shutdown.
+  log_info(gc)("size copied: %lu", _size_copied);
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();
@@ -2735,6 +2738,15 @@ void G1CollectedHeap::do_collection_pause_at_safepoint_helper() {
     // itself is released in SuspendibleThreadSet::desynchronize().
     start_concurrent_cycle(collector.concurrent_operation_is_full_mark());
     ConcurrentGCBreakpoints::notify_idle_to_active();
+
+    if (G1UseSTWMarking) {
+      MutexLocker x(G1MarkFinished_lock, Mutex::_no_safepoint_check_flag);
+      while(_cm_thread->in_progress()){
+        G1MarkFinished_lock->wait();
+      }
+      
+    }
+    
   }
 }
 

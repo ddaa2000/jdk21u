@@ -65,7 +65,7 @@ double G1ConcurrentMarkThread::mmu_delay_end(G1Policy* policy, bool remark) {
   //    we will not forget to consider that pause in the MMU calculation.
   // 3. If currently a gc is running, ConcurrentMarkThread will wait it to be finished.
   //    And then sleep for predicted amount of time by delay_to_keep_mmu().
-  SuspendibleThreadSetJoiner sts_join;
+  SuspendibleThreadSetJoiner sts_join(!G1UseSTWMarking);
 
   const G1Analytics* analytics = policy->analytics();
   double prediction_ms = remark ? analytics->predict_remark_time_ms()
@@ -249,7 +249,11 @@ bool G1ConcurrentMarkThread::subphase_delay_to_keep_mmu_before_remark() {
 bool G1ConcurrentMarkThread::subphase_remark() {
   ConcurrentGCBreakpoints::at("BEFORE MARKING COMPLETED");
   VM_G1PauseRemark op;
-  VMThread::execute(&op);
+  if(G1UseSTWMarking){
+    op.doit();
+  } else {
+    VMThread::execute(&op);
+  }
   return _cm->has_aborted();
 }
 
@@ -268,14 +272,43 @@ bool G1ConcurrentMarkThread::phase_delay_to_keep_mmu_before_cleanup() {
 bool G1ConcurrentMarkThread::phase_cleanup() {
   ConcurrentGCBreakpoints::at("BEFORE REBUILD COMPLETED");
   VM_G1PauseCleanup op;
-  VMThread::execute(&op);
+  if(G1UseSTWMarking){
+    op.doit();
+  } else {
+    VMThread::execute(&op);
+  }
   return _cm->has_aborted();
 }
+
+class G1TraceWSSClosure : public HeapRegionClosure {
+private:
+  size_t _traced_size;
+public:
+  G1TraceWSSClosure() : HeapRegionClosure(), _traced_size(0) {}
+
+  virtual bool do_heap_region(HeapRegion* r) {
+    _traced_size += r->get_traced_page_size();
+    r->clear_traced();
+    return false;
+  }
+
+  size_t traced_size() const {
+    return _traced_size;
+  }
+};
 
 bool G1ConcurrentMarkThread::phase_clear_bitmap_for_next_mark() {
   ConcurrentGCBreakpoints::at("AFTER CLEANUP STARTED");
   G1ConcPhaseTimer p(_cm, "Concurrent Cleanup for Next Mark");
   _cm->cleanup_for_next_mark();
+
+  if(RecordTraceWSS){
+    G1TraceWSSClosure cl;
+    G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    g1h->heap_region_iterate(&cl);
+    log_info(gc)("traced size: %.2lf", cl.traced_size() / 1024.0 / 1024 / 1024);
+  }
+
   return _cm->has_aborted();
 }
 
@@ -353,7 +386,7 @@ void G1ConcurrentMarkThread::concurrent_cycle_end(bool mark_cycle_completed) {
   // completed. This will also notify the G1OldGCCount_lock in case a
   // Java thread is waiting for a full GC to happen (e.g., it
   // called System.gc() with +ExplicitGCInvokesConcurrent).
-  SuspendibleThreadSetJoiner sts_join;
+  SuspendibleThreadSetJoiner sts_join(!G1UseSTWMarking);
   G1CollectedHeap::heap()->increment_old_marking_cycles_completed(true /* concurrent */,
                                                                   mark_cycle_completed /* heap_examined */);
 

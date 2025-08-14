@@ -192,6 +192,9 @@
   product(bool, ExplicitGCInvokesConcurrent, false,                         \
           "A System.gc() request invokes a concurrent collection; "         \
           "(effective only when using concurrent collectors)")              \
+  product(bool, RecordTraceWSS, false,                                       \
+          "A System.gc() request invokes a concurrent collection; "         \
+          "(effective only when using concurrent collectors)")              \
                                                                             \
   product(uintx, GCLockerEdenExpansionPercent, 5,                           \
           "How much the GC can expand the eden by while the GC locker "     \
