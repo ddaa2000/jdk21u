@@ -991,13 +991,13 @@ static G1DataStructure* initialize_predefined_kbp() {
 }
 
 void G1DataStructureManager::initialize_predefined_data_structures() {
-    if(strcmp(DataBench, "Spark_nb") == 0){
+    if(strcmp(DataBench, "Spark_nb") == 0 || strcmp(DataBench, "Spark_ir") == 0 || strcmp(DataBench, "Spark_lgr") == 0){
         _data_structure_types.add(initialize_predefined_sparkml());
     } else if (strcmp(DataBench, "Smile_knn") == 0) {
         _data_structure_types.add(initialize_predefined_smileknn());
     } else if (strcmp(DataBench, "Smile_km") == 0) {
         _data_structure_types.add(initialize_predefined_smilekm());
-    } else if (strcmp(DataBench, "GraphChi_wcc") == 0) {
+    } else if (strcmp(DataBench, "GraphChi_wcc") == 0 || strcmp(DataBench, "GraphChi_pr") == 0) {
         _data_structure_types.add(initialize_predefined_graphchi());
     } else if (strcmp(DataBench, "GraphChi_kc") == 0) {
         _data_structure_types.add(initialize_predefined_graphchi());
