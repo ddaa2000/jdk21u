@@ -101,6 +101,8 @@
 # include <sys/times.h>
 # include <sys/utsname.h>
 # include <sys/socket.h>
+# include <netinet/in.h>
+# include <arpa/inet.h>
 # include <pwd.h>
 # include <poll.h>
 # include <fcntl.h>
@@ -115,6 +117,7 @@
 # include <sys/ioctl.h>
 # include <linux/elf-em.h>
 # include <sys/prctl.h>
+#include <linux/mman.h>
 #ifdef __GLIBC__
 # include <malloc.h>
 #endif
@@ -5756,4 +5759,200 @@ bool os::trim_native_heap(os::size_change_t* rss_change) {
 #else
   return false; // musl
 #endif
+}
+
+
+void os::Linux::madvise_cold(void* addr, size_t bytes){
+  int result = ::madvise(addr, bytes, MADV_COLD);
+  if (result != 0) {
+    fatal("madvise(MADV_COLD) failed: %s", os::strerror(errno));
+  }
+}
+
+
+void os::Linux::madvise_pageout(void* addr, size_t bytes){
+  int result = ::madvise(addr, bytes, MADV_PAGEOUT);
+  if (result != 0) {
+    fatal("madvise(MADV_PAGEOUT) failed: %s", os::strerror(errno));
+  }
+}
+
+void os::madvise_cold(void* addr, size_t bytes) {
+  os::Linux::madvise_cold(addr, bytes);
+}
+
+void os::madvise_pageout(void* addr, size_t bytes) {
+  os::Linux::madvise_pageout(addr, bytes);
+}
+
+// LRU Status checking implementation
+// Based on Linux kernel page flag definitions
+#define KPF_LRU     5
+#define KPF_ACTIVE  6
+
+// Pagemap kernel ABI bits
+#define PM_ENTRY_BYTES      8
+#define PM_PFRAME_BITS      55
+#define PM_PFRAME_MASK      ((1LL << PM_PFRAME_BITS) - 1)
+#define PM_PFRAME(x)        ((x) & PM_PFRAME_MASK)
+#define PM_PRESENT          (1ULL << 63)
+
+os::LRUStatus os::Linux::check_page_lru_status(void* vaddr) {
+  int page_size = os::vm_page_size();
+  uintptr_t addr = (uintptr_t)vaddr;
+  
+  // Align address to page boundary
+  addr = addr & ~(page_size - 1);
+  
+  // Calculate page index
+  uint64_t page_idx = addr / page_size;
+  
+  // Open pagemap file
+  char pagemap_path[64];
+  jio_snprintf(pagemap_path, sizeof(pagemap_path), "/proc/self/pagemap");
+  int pagemap_fd = os::open(pagemap_path, O_RDONLY, 0);
+  if (pagemap_fd < 0) {
+    log_info(gc)("not in list 1");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Read pagemap entry
+  uint64_t pagemap_entry;
+  ssize_t bytes_read = os::read_at(pagemap_fd, &pagemap_entry, sizeof(pagemap_entry), page_idx * PM_ENTRY_BYTES);
+  ::close(pagemap_fd);
+  
+  if (bytes_read != sizeof(pagemap_entry)) {
+    log_info(gc)("not in list 2");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Check if page is present in RAM
+  if (!(pagemap_entry & PM_PRESENT)) {
+    log_info(gc)("not in list 3");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Get physical frame number
+  uint64_t pfn = PM_PFRAME(pagemap_entry);
+  
+  // Open kpageflags file
+  int kpageflags_fd = os::open("/proc/kpageflags", O_RDONLY, 0);
+  if (kpageflags_fd < 0) {
+    log_info(gc)("not in list 4");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Read kpageflags entry
+  uint64_t kpageflags_entry;
+  bytes_read = os::read_at(kpageflags_fd, &kpageflags_entry, sizeof(kpageflags_entry), pfn * sizeof(uint64_t));
+  ::close(kpageflags_fd);
+  
+  if (bytes_read != sizeof(kpageflags_entry)) {
+    log_info(gc)("not in list 5");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Check LRU flags
+  if (!(kpageflags_entry & (1ULL << KPF_LRU))) {
+    log_info(gc)("not in list 6");
+    return os::LRU_NOT_IN_LIST;
+  }
+
+  // log_info(gc)("flags %lx", kpageflags_entry);
+  
+  // Page is in LRU list, check if it's active or inactive
+  if (kpageflags_entry & (1ULL << KPF_ACTIVE)) {
+    return os::LRU_ACTIVE;
+  } else {
+    return os::LRU_INACTIVE;
+  }
+}
+
+// TCP client to query LRU status from remote server
+// Server should be running on localhost:9999
+static os::LRUStatus check_page_lru_status_tcp(void* vaddr) {
+  // Server configuration
+  const char* server_host = "127.0.0.1";
+  const int server_port = 9999;
+  
+  // Create socket
+  int sock_fd = ::socket(AF_INET, SOCK_STREAM, 0);
+  if (sock_fd < 0) {
+    log_warning(gc)("Failed to create socket for LRU status query: %s", os::strerror(errno));
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Set socket timeout to avoid hanging
+  struct timeval timeout;
+  timeout.tv_sec = 1;  // 1 second timeout
+  timeout.tv_usec = 0;
+  ::setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+  ::setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+  
+  // Setup server address
+  struct sockaddr_in server_addr;
+  memset(&server_addr, 0, sizeof(server_addr));
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(server_port);
+  
+  if (::inet_pton(AF_INET, server_host, &server_addr.sin_addr) <= 0) {
+    log_warning(gc)("Invalid server address: %s", server_host);
+    ::close(sock_fd);
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Connect to server
+  if (::connect(sock_fd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
+    log_warning(gc)("Failed to connect to LRU status server at %s:%d: %s", 
+                    server_host, server_port, os::strerror(errno));
+    ::close(sock_fd);
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Prepare request: "pid vaddr_hex\n"
+  char request[128];
+  pid_t pid = getpid();
+  uintptr_t addr = (uintptr_t)vaddr;
+  jio_snprintf(request, sizeof(request), "%d %lx\n", pid, addr);
+  
+  // Send request
+  ssize_t sent = ::send(sock_fd, request, strlen(request), 0);
+  if (sent < 0) {
+    log_warning(gc)("Failed to send request to LRU status server: %s", os::strerror(errno));
+    ::close(sock_fd);
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  // Receive response
+  char response[256];
+  memset(response, 0, sizeof(response));
+  ssize_t received = ::recv(sock_fd, response, sizeof(response) - 1, 0);
+  ::close(sock_fd);
+  
+  if (received <= 0) {
+    log_warning(gc)("Failed to receive response from LRU status server");
+    return os::LRU_NOT_IN_LIST;
+  }
+  
+  response[received] = '\0';
+  
+  // Parse response
+  if (strstr(response, "INACTIVE_LRU") != nullptr) {
+    return os::LRU_INACTIVE;
+  } else if (strstr(response, "ACTIVE_LRU") != nullptr) {
+    return os::LRU_ACTIVE;
+  }  else if (strstr(response, "NOT_IN_LRU") != nullptr) {
+    return os::LRU_NOT_IN_LIST;
+  } else {
+    log_warning(gc)("Unexpected response from LRU status server: %s", response);
+    return os::LRU_NOT_IN_LIST;
+  }
+}
+
+// Public interface implementation
+// Uses TCP to query remote LRU status server
+os::LRUStatus os::check_page_lru_status(void* vaddr) {
+  return check_page_lru_status_tcp(vaddr);
+  // Fallback to local implementation if needed:
+  // return os::Linux::check_page_lru_status(vaddr);
 }

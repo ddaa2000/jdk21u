@@ -1272,7 +1272,10 @@ G1CollectedHeap::G1CollectedHeap() :
   _ref_processor_cm(nullptr),
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
-  _region_attr() {
+  _region_attr(),
+  _lru_active_count(0),
+  _lru_inactive_count(0),
+  _lru_not_in_list_count(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1537,6 +1540,25 @@ bool G1CollectedHeap::concurrent_mark_is_terminating() const {
 }
 
 void G1CollectedHeap::stop() {
+  // Print accumulated LRU statistics before stopping
+  LINUX_ONLY({
+    if (total_lru_checked_count() > 0) {
+      log_info(gc)("LRU Statistics Summary:");
+      log_info(gc)("  Active LRU pages: %zu", _lru_active_count);
+      log_info(gc)("  Inactive LRU pages: %zu", _lru_inactive_count);
+      log_info(gc)("  Not in LRU list: %zu", _lru_not_in_list_count);
+      log_info(gc)("  Total pages checked: %zu", total_lru_checked_count());
+      
+      // Calculate percentages
+      double total = (double)total_lru_checked_count();
+      if (total > 0) {
+        log_info(gc)("  Active LRU percentage: %.2f%%", (100.0 * _lru_active_count) / total);
+        log_info(gc)("  Inactive LRU percentage: %.2f%%", (100.0 * _lru_inactive_count) / total);
+        log_info(gc)("  Not in LRU percentage: %.2f%%", (100.0 * _lru_not_in_list_count) / total);
+      }
+    }
+  })
+
   // Stop all concurrent threads. We do this to make sure these threads
   // do not continue to execute and access resources (e.g. logging)
   // that are destroyed during shutdown.
@@ -2235,6 +2257,15 @@ void G1CollectedHeap::print_on(outputStream* st) const {
     }
     st->cr();
   }
+  
+  // Print LRU statistics
+  LINUX_ONLY({
+    st->print("  LRU Statistics: Active=%zu, Inactive=%zu, NotInList=%zu (Total=%zu)",
+              _lru_active_count, _lru_inactive_count, _lru_not_in_list_count,
+              total_lru_checked_count());
+    st->cr();
+  })
+  
   MetaspaceUtils::print_on(st);
 }
 
@@ -2389,6 +2420,9 @@ HeapWord* G1CollectedHeap::do_collection_pause(size_t word_size,
 
 void G1CollectedHeap::start_concurrent_cycle(bool concurrent_operation_is_full_mark) {
   assert(!_cm_thread->in_progress(), "Can not start concurrent operation while in progress");
+
+  // Reset LRU statistics at the start of concurrent marking
+  LINUX_ONLY(reset_lru_stats();)
 
   MutexLocker x(CGC_lock, Mutex::_no_safepoint_check_flag);
   if (concurrent_operation_is_full_mark) {
@@ -2628,6 +2662,24 @@ void G1CollectedHeap::make_pending_list_reachable() {
 void G1CollectedHeap::set_humongous_stats(uint num_humongous_total, uint num_humongous_candidates) {
   _num_humongous_objects = num_humongous_total;
   _num_humongous_reclaim_candidates = num_humongous_candidates;
+}
+
+void G1CollectedHeap::update_lru_stats(os::LRUStatus status) {
+  switch (status) {
+    case os::LRU_ACTIVE:
+      _lru_active_count++;
+      break;
+    case os::LRU_INACTIVE:
+      _lru_inactive_count++;
+      break;
+    case os::LRU_NOT_IN_LIST:
+      _lru_not_in_list_count++;
+      break;
+    default:
+      // Unknown status, count as not in list
+      _lru_not_in_list_count++;
+      break;
+  }
 }
 
 bool G1CollectedHeap::should_sample_collection_set_candidates() const {

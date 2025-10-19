@@ -77,6 +77,7 @@
 #include "utilities/align.hpp"
 #include "utilities/formatBuffer.hpp"
 #include "utilities/growableArray.hpp"
+#include "runtime/os.hpp"
 
 bool G1CMBitMapClosure::do_addr(HeapWord* const addr) {
   assert(addr < _cm->finger(), "invariant");
@@ -2122,6 +2123,9 @@ void G1CMTask::update_region_limit() {
 
 void G1CMTask::giveup_current_region() {
   assert(_curr_region != nullptr, "invariant");
+  if (G1UseMadviseCold) {
+    os::madvise_cold(_curr_region->bottom(), HeapRegion::GrainBytes);
+  }
   clear_region_fields();
 }
 
@@ -2870,6 +2874,7 @@ G1CMTask::G1CMTask(uint worker_id,
   _refs_reached(0),
   _refs_reached_limit(0),
   _real_refs_reached_limit(0),
+  _lru_sample_counter(0),
   _has_aborted(false),
   _has_timed_out(false),
   _draining_satb_buffers(false),

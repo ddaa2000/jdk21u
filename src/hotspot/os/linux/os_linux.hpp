@@ -429,6 +429,14 @@ class os::Linux {
   // otherwise does nothing and returns -2.
   static int malloc_info(FILE* stream);
 #endif // GLIBC
+
+
+public:
+  static void madvise_cold(void* addr, size_t bytes);
+  static void madvise_pageout(void* addr, size_t bytes);
+  
+  // Check if a virtual page is in active or inactive LRU list
+  static os::LRUStatus check_page_lru_status(void* vaddr);
 };
 
 #endif // OS_LINUX_OS_LINUX_HPP

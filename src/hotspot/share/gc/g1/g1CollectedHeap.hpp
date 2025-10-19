@@ -57,6 +57,7 @@
 #include "memory/iterator.hpp"
 #include "memory/memRegion.hpp"
 #include "runtime/mutexLocker.hpp"
+#include "runtime/os.hpp"
 #include "runtime/threadSMR.hpp"
 #include "utilities/bitMap.hpp"
 
@@ -259,6 +260,24 @@ public:
   bool has_humongous_reclaim_candidates() const { return _num_humongous_reclaim_candidates > 0; }
 
   void set_humongous_stats(uint num_humongous_total, uint num_humongous_candidates);
+
+  // LRU status statistics accessors
+  size_t lru_active_count() const { return _lru_active_count; }
+  size_t lru_inactive_count() const { return _lru_inactive_count; }
+  size_t lru_not_in_list_count() const { return _lru_not_in_list_count; }
+  size_t total_lru_checked_count() const { 
+    return _lru_active_count + _lru_inactive_count + _lru_not_in_list_count; 
+  }
+  
+  // Reset LRU statistics
+  void reset_lru_stats() {
+    _lru_active_count = 0;
+    _lru_inactive_count = 0;
+    _lru_not_in_list_count = 0;
+  }
+  
+  // Update LRU statistics (thread-safe)
+  void update_lru_stats(os::LRUStatus status);
 
   bool should_sample_collection_set_candidates() const;
   void set_collection_set_candidates_stats(G1MonotonicArenaMemoryStats& stats);
@@ -1042,6 +1061,11 @@ public:
   // the collection set or not. Each of the array's elements denotes whether the
   // corresponding region is in the collection set or not.
   G1HeapRegionAttrBiasedMappedArray _region_attr;
+
+  // LRU status statistics during concurrent marking
+  size_t _lru_active_count;    // Count of pages in active LRU list
+  size_t _lru_inactive_count; // Count of pages in inactive LRU list
+  size_t _lru_not_in_list_count; // Count of pages not in LRU list
 
  public:
 

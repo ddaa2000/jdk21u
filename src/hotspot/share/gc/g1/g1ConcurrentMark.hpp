@@ -682,6 +682,9 @@ private:
   // it was decreased).
   size_t                      _real_refs_reached_limit;
 
+  // Counter for LRU status sampling (check every 100 calls)
+  uint                        _lru_sample_counter;
+
   // If true, then the task has aborted for some reason
   bool                        _has_aborted;
   // Set when the task aborts because it has met its time quota

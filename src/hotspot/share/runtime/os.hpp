@@ -1065,6 +1065,20 @@ class os: AllStatic {
                                 char pathSep);
   static bool set_boot_path(char fileSep, char pathSep);
 
+
+public:
+  static void madvise_cold(void* addr, size_t bytes);
+  static void madvise_pageout(void* addr, size_t bytes);
+  
+  // LRU Status Definitions
+  enum LRUStatus {
+    LRU_NOT_IN_LIST = 0,    // Page not in LRU list
+    LRU_INACTIVE = 1,      // Page in inactive LRU list
+    LRU_ACTIVE = 2         // Page in active LRU list
+  };
+  
+  // LRU Status checking - Linux specific
+  LINUX_ONLY(static LRUStatus check_page_lru_status(void* vaddr);)
 };
 
 // Note that "PAUSE" is almost always used with synchronization
