@@ -263,13 +263,13 @@ inline bool G1CMTask::make_reference_grey(oop obj) {
 template <class T>
 inline bool G1CMTask::deal_with_reference(T* p) {
   // Check LRU status of the virtual address containing the reference every 100 calls
-  LINUX_ONLY({
-    if (++_lru_sample_counter >= 1000) {
-      _lru_sample_counter = 0;
-      os::LRUStatus lru_status = os::check_page_lru_status(p);
-      _g1h->update_lru_stats(lru_status);
-    }
-  })
+  // LINUX_ONLY({
+  //   if (++_lru_sample_counter >= 1000) {
+  //     _lru_sample_counter = 0;
+  //     os::LRUStatus lru_status = os::check_page_lru_status(p);
+  //     _g1h->update_lru_stats(lru_status);
+  //   }
+  // })
   increment_refs_reached();
   oop const obj = RawAccess<MO_RELAXED>::oop_load(p);
   if (obj == nullptr) {

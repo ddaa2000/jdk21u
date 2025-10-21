@@ -193,61 +193,61 @@ Node* G1BarrierSetC2::load_barrier(GraphKit* kit,
                                             Node* ctl,
                                             Node* obj) const {
 
-    // log_info(gc)("load barrier compile");
+    log_info(gc)("load barrier compile");
 
-    // IdealKit ideal(kit, true);
+    IdealKit ideal(kit, true);
 
-    // Node* tls = __ thread(); // ThreadLocalStorage
+    Node* tls = __ thread(); // ThreadLocalStorage
 
-    // Node* no_base = __ top();
-    // Node* zero    = __ ConI(0);
-    // Node* zeroX   = __ ConX(0);
+    Node* no_base = __ top();
+    Node* zero    = __ ConI(0);
+    Node* zeroX   = __ ConX(0);
 
-    // float likely   = PROB_LIKELY(0.999);
-    // float unlikely = PROB_UNLIKELY(0.999);
+    float likely   = PROB_LIKELY(0.999);
+    float unlikely = PROB_UNLIKELY(0.999);
 
-    // // BasicType active_type = in_bytes(SATBMarkQueue::byte_width_of_active()) == 4 ? T_INT : T_BYTE;
-
-
-    // // // Haoran: modify
-    // // const int prefetch_marking_offset = in_bytes(G1ThreadLocalData::prefetch_queue_active_offset());
-    // // const int prefetch_index_offset   = in_bytes(G1ThreadLocalData::prefetch_queue_index_offset());
-    // // const int prefetch_buffer_offset  = in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset());
-    // // Node* prefetch_marking_adr = __ AddP(no_base, tls, __ ConX(prefetch_marking_offset));
-    // // Node* prefetch_buffer_adr  = __ AddP(no_base, tls, __ ConX(prefetch_buffer_offset));
-    // // Node* prefetch_index_adr   = __ AddP(no_base, tls, __ ConX(prefetch_index_offset));
-
-    // // Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
-
-    // // __ if_then(prefetch_marking, BoolTest::ne, zero, unlikely); {
-    // //     BasicType index_bt = TypeX_X->basic_type();
-    // //     assert(sizeof(size_t) == type2aelembytes(index_bt), "Loading G1 PrefetchQueue::_index with wrong size.");
-    // //     // val = __ load(__ ctrl(), adr, val_type, bt, alias_idx);
-    //     // if (pre_val != NULL)
-
-    // BasicType index_bt = TypeX_X->basic_type();
+    // BasicType active_type = in_bytes(SATBMarkQueue::byte_width_of_active()) == 4 ? T_INT : T_BYTE;
 
 
+    // // Haoran: modify
+    // const int prefetch_marking_offset = in_bytes(G1ThreadLocalData::prefetch_queue_active_offset());
+    // const int prefetch_index_offset   = in_bytes(G1ThreadLocalData::prefetch_queue_index_offset());
+    // const int prefetch_buffer_offset  = in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset());
+    // Node* prefetch_marking_adr = __ AddP(no_base, tls, __ ConX(prefetch_marking_offset));
+    // Node* prefetch_buffer_adr  = __ AddP(no_base, tls, __ ConX(prefetch_buffer_offset));
+    // Node* prefetch_index_adr   = __ AddP(no_base, tls, __ ConX(prefetch_index_offset));
 
-    // __ if_then(obj, BoolTest::ne, kit->null()); {
-    //   const int lru_sample_counter_offset = in_bytes(G1ThreadLocalData::lru_sample_counter_offset());
-    //   Node* lru_sample_counter_adr = __ AddP(no_base, tls, __ ConX(lru_sample_counter_offset));
-    //   Node* lru_sample_counter = __ load(__ ctrl(), lru_sample_counter_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
-    //   Node* next_counter = kit->gvn().transform(new SubXNode(lru_sample_counter, __ ConX(0)));
+    // Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
 
-    //   const TypeFunc* tf = load_ref_field_entry_Type();
-    //   __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::load_ref_field_entry), "load_ref_field_entry", obj, tls);
+    // __ if_then(prefetch_marking, BoolTest::ne, zero, unlikely); {
+    //     BasicType index_bt = TypeX_X->basic_type();
+    //     assert(sizeof(size_t) == type2aelembytes(index_bt), "Loading G1 PrefetchQueue::_index with wrong size.");
+    //     // val = __ load(__ ctrl(), adr, val_type, bt, alias_idx);
+        // if (pre_val != NULL)
+
+    BasicType index_bt = TypeX_X->basic_type();
+
+
+
+    __ if_then(obj, BoolTest::ne, kit->null()); {
+      const int lru_sample_counter_offset = in_bytes(G1ThreadLocalData::lru_sample_counter_offset());
+      Node* lru_sample_counter_adr = __ AddP(no_base, tls, __ ConX(lru_sample_counter_offset));
+      Node* lru_sample_counter = __ load(__ ctrl(), lru_sample_counter_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
+      Node* next_counter = kit->gvn().transform(new SubXNode(lru_sample_counter, __ ConX(0)));
+
+      const TypeFunc* tf = load_ref_field_entry_Type();
+      __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::load_ref_field_entry), "load_ref_field_entry", obj, tls);
   
-    //   __ if_then(lru_sample_counter, BoolTest::ne, zero, unlikely); {
-    //     __ store(__ ctrl(), lru_sample_counter_adr, next_counter, index_bt, Compile::AliasIdxRaw, MemNode::unordered);
-    //   } __ else_(); {
+      __ if_then(lru_sample_counter, BoolTest::ne, zero, unlikely); {
+        __ store(__ ctrl(), lru_sample_counter_adr, next_counter, index_bt, Compile::AliasIdxRaw, MemNode::unordered);
+      } __ else_(); {
 
-    //   }
-    //   __ end_if();
-    // } __ end_if();  // (val != NULL)
-    // // } __ end_if();  // (!marking)
+      }
+      __ end_if();
+    } __ end_if();  // (val != NULL)
+    // } __ end_if();  // (!marking)
 
-    // kit->final_sync(ideal);
+    kit->final_sync(ideal);
 
     return obj;
 }
@@ -763,7 +763,7 @@ bool G1BarrierSetC2::is_gc_barrier_node(Node* node) const {
     return false;
   }
 
-  return strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0;
+  return strcmp(call->_name, "write_ref_field_pre_entry") == 0 || strcmp(call->_name, "write_ref_field_post_entry") == 0 || strcmp(call->_name, "load_ref_field_entry") == 0;
 }
 
 bool G1BarrierSetC2::is_g1_pre_val_load(Node* n) {
