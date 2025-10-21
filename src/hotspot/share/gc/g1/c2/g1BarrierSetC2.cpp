@@ -39,6 +39,7 @@
 #include "opto/rootnode.hpp"
 #include "opto/type.hpp"
 #include "utilities/macros.hpp"
+#include "logging/log.hpp"
 
 const TypeFunc *G1BarrierSetC2::write_ref_field_pre_entry_Type() {
   const Type **fields = TypeTuple::fields(2);
@@ -62,6 +63,19 @@ const TypeFunc *G1BarrierSetC2::write_ref_field_post_entry_Type() {
   // create result type (range)
   fields = TypeTuple::fields(0);
   const TypeTuple *range = TypeTuple::make(TypeFunc::Parms, fields);
+
+  return TypeFunc::make(domain, range);
+}
+
+const TypeFunc *G1BarrierSetC2::load_ref_field_entry_Type() {
+  const Type **fields = TypeTuple::fields(2);
+  fields[TypeFunc::Parms+0] = TypeInstPtr::NOTNULL; // field value
+  fields[TypeFunc::Parms+1] = TypeRawPtr::NOTNULL; // thread
+  const TypeTuple *domain = TypeTuple::make(TypeFunc::Parms+2, fields);
+
+  // create result type (range)
+  fields = TypeTuple::fields(0);
+  const TypeTuple *range = TypeTuple::make(TypeFunc::Parms+0, fields);
 
   return TypeFunc::make(domain, range);
 }
@@ -174,6 +188,70 @@ bool G1BarrierSetC2::g1_can_remove_pre_barrier(GraphKit* kit,
 
   return false;
 }
+
+Node* G1BarrierSetC2::load_barrier(GraphKit* kit,
+                                            Node* ctl,
+                                            Node* obj) const {
+
+    // log_info(gc)("load barrier compile");
+
+    // IdealKit ideal(kit, true);
+
+    // Node* tls = __ thread(); // ThreadLocalStorage
+
+    // Node* no_base = __ top();
+    // Node* zero    = __ ConI(0);
+    // Node* zeroX   = __ ConX(0);
+
+    // float likely   = PROB_LIKELY(0.999);
+    // float unlikely = PROB_UNLIKELY(0.999);
+
+    // // BasicType active_type = in_bytes(SATBMarkQueue::byte_width_of_active()) == 4 ? T_INT : T_BYTE;
+
+
+    // // // Haoran: modify
+    // // const int prefetch_marking_offset = in_bytes(G1ThreadLocalData::prefetch_queue_active_offset());
+    // // const int prefetch_index_offset   = in_bytes(G1ThreadLocalData::prefetch_queue_index_offset());
+    // // const int prefetch_buffer_offset  = in_bytes(G1ThreadLocalData::prefetch_queue_buffer_offset());
+    // // Node* prefetch_marking_adr = __ AddP(no_base, tls, __ ConX(prefetch_marking_offset));
+    // // Node* prefetch_buffer_adr  = __ AddP(no_base, tls, __ ConX(prefetch_buffer_offset));
+    // // Node* prefetch_index_adr   = __ AddP(no_base, tls, __ ConX(prefetch_index_offset));
+
+    // // Node* prefetch_marking = __ load(__ ctrl(), prefetch_marking_adr, TypeInt::INT, active_type, Compile::AliasIdxRaw);
+
+    // // __ if_then(prefetch_marking, BoolTest::ne, zero, unlikely); {
+    // //     BasicType index_bt = TypeX_X->basic_type();
+    // //     assert(sizeof(size_t) == type2aelembytes(index_bt), "Loading G1 PrefetchQueue::_index with wrong size.");
+    // //     // val = __ load(__ ctrl(), adr, val_type, bt, alias_idx);
+    //     // if (pre_val != NULL)
+
+    // BasicType index_bt = TypeX_X->basic_type();
+
+
+
+    // __ if_then(obj, BoolTest::ne, kit->null()); {
+    //   const int lru_sample_counter_offset = in_bytes(G1ThreadLocalData::lru_sample_counter_offset());
+    //   Node* lru_sample_counter_adr = __ AddP(no_base, tls, __ ConX(lru_sample_counter_offset));
+    //   Node* lru_sample_counter = __ load(__ ctrl(), lru_sample_counter_adr, TypeX_X, index_bt, Compile::AliasIdxRaw);
+    //   Node* next_counter = kit->gvn().transform(new SubXNode(lru_sample_counter, __ ConX(0)));
+
+    //   const TypeFunc* tf = load_ref_field_entry_Type();
+    //   __ make_leaf_call(tf, CAST_FROM_FN_PTR(address, G1BarrierSetRuntime::load_ref_field_entry), "load_ref_field_entry", obj, tls);
+  
+    //   __ if_then(lru_sample_counter, BoolTest::ne, zero, unlikely); {
+    //     __ store(__ ctrl(), lru_sample_counter_adr, next_counter, index_bt, Compile::AliasIdxRaw, MemNode::unordered);
+    //   } __ else_(); {
+
+    //   }
+    //   __ end_if();
+    // } __ end_if();  // (val != NULL)
+    // // } __ end_if();  // (!marking)
+
+    // kit->final_sync(ideal);
+
+    return obj;
+}
+
 
 // G1 pre/post barriers
 void G1BarrierSetC2::pre_barrier(GraphKit* kit,
@@ -621,15 +699,22 @@ Node* G1BarrierSetC2::load_at_resolved(C2Access& access, const Type* val_type) c
   bool need_read_barrier = (((on_weak || on_phantom) && !no_keepalive) ||
                             (in_heap && unknown && offset != top && obj != top));
 
-  if (!access.is_oop() || !need_read_barrier) {
-    return CardTableBarrierSetC2::load_at_resolved(access, val_type);
-  }
-
-  assert(access.is_parse_access(), "entry not supported at optimization time");
 
   C2ParseAccess& parse_access = static_cast<C2ParseAccess&>(access);
   GraphKit* kit = parse_access.kit();
   Node* load;
+
+  if (!access.is_oop() || !need_read_barrier) {
+    if (access.is_oop()) {
+      return load_barrier(kit, kit->control(), CardTableBarrierSetC2::load_at_resolved(access, val_type));
+    } else {
+      return CardTableBarrierSetC2::load_at_resolved(access, val_type);
+    }
+  }
+
+  assert(access.is_parse_access(), "entry not supported at optimization time");
+
+
 
   Node* control =  kit->control();
   const TypePtr* adr_type = access.addr().type();
@@ -652,13 +737,18 @@ Node* G1BarrierSetC2::load_at_resolved(C2Access& access, const Type* val_type) c
     // Add memory barrier to prevent commoning reads from this field
     // across safepoint since GC can change its value.
     kit->insert_mem_bar(Op_MemBarCPUOrder);
+    return load;
   } else if (unknown) {
     // We do not require a mem bar inside pre_barrier if need_mem_bar
     // is set: the barriers would be emitted by us.
     insert_pre_barrier(kit, obj, offset, load, !need_cpu_mem_bar);
+    return load;
+  } else if (access.is_oop()) {
+    return load_barrier(kit, kit->control(), load);
+  } else {
+    return load;
   }
-
-  return load;
+  // return load;
 }
 
 bool G1BarrierSetC2::is_gc_barrier_node(Node* node) const {

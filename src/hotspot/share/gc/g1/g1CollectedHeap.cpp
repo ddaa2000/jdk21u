@@ -2422,7 +2422,7 @@ void G1CollectedHeap::start_concurrent_cycle(bool concurrent_operation_is_full_m
   assert(!_cm_thread->in_progress(), "Can not start concurrent operation while in progress");
 
   // Reset LRU statistics at the start of concurrent marking
-  LINUX_ONLY(reset_lru_stats();)
+  // LINUX_ONLY(reset_lru_stats();)
 
   MutexLocker x(CGC_lock, Mutex::_no_safepoint_check_flag);
   if (concurrent_operation_is_full_mark) {

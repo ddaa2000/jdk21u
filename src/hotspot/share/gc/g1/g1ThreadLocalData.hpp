@@ -36,15 +36,19 @@ class G1ThreadLocalData {
 private:
   SATBMarkQueue _satb_mark_queue;
   G1DirtyCardQueue _dirty_card_queue;
+  size_t _lru_sample_counter;
 
   G1ThreadLocalData() :
       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
-      _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()) {}
+      _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()),
+      _lru_sample_counter(10000) {}
 
+public:
   static G1ThreadLocalData* data(Thread* thread) {
     assert(UseG1GC, "Sanity");
     return thread->gc_data<G1ThreadLocalData>();
   }
+private:
 
   static ByteSize satb_mark_queue_offset() {
     return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _satb_mark_queue);
@@ -89,6 +93,14 @@ public:
 
   static ByteSize dirty_card_queue_buffer_offset() {
     return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_buf();
+  }
+
+  void reset_lru_sample_counter() {
+    _lru_sample_counter = 10000;
+  }
+
+  static ByteSize lru_sample_counter_offset() {
+    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _lru_sample_counter);
   }
 };
 

@@ -54,6 +54,10 @@ protected:
                             BasicType bt,
                             bool use_precise) const;
 
+  virtual Node* load_barrier(GraphKit* kit,
+                            Node* ctl,
+                            Node* obj) const;
+
   bool g1_can_remove_pre_barrier(GraphKit* kit,
                                  PhaseValues* phase,
                                  Node* adr,
@@ -81,6 +85,7 @@ protected:
 
   static const TypeFunc* write_ref_field_pre_entry_Type();
   static const TypeFunc* write_ref_field_post_entry_Type();
+  static const TypeFunc* load_ref_field_entry_Type();
 
   virtual Node* load_at_resolved(C2Access& access, const Type* val_type) const;
 

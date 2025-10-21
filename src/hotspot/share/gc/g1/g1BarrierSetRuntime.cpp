@@ -28,6 +28,9 @@
 #include "gc/g1/g1ThreadLocalData.hpp"
 #include "runtime/interfaceSupport.inline.hpp"
 #include "utilities/macros.hpp"
+#include "gc/g1/g1CollectedHeap.hpp"
+#include "logging/log.hpp"
+
 
 void G1BarrierSetRuntime::write_ref_array_pre_oop_entry(oop* dst, size_t length) {
   G1BarrierSet *bs = barrier_set_cast<G1BarrierSet>(BarrierSet::barrier_set());
@@ -60,4 +63,15 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_post_entry(volatile G1CardTa
   assert(thread == JavaThread::current(), "pre-condition");
   G1DirtyCardQueue& queue = G1ThreadLocalData::dirty_card_queue(thread);
   G1BarrierSet::dirty_card_queue_set().enqueue(queue, card_addr);
+JRT_END
+
+JRT_LEAF(void, G1BarrierSetRuntime::load_ref_field_entry(oopDesc* new_val, JavaThread* thread))
+  assert(thread == JavaThread::current(), "pre-condition");
+  assert(new_val != nullptr, "should be optimized out");
+  assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  os::LRUStatus lru_status = os::check_page_lru_status(new_val);
+  G1CollectedHeap* g1h = G1CollectedHeap::heap();
+  g1h->update_lru_stats(lru_status);
+  G1ThreadLocalData::data(thread)->reset_lru_sample_counter();
+  log_info(gc)("load barrier called");
 JRT_END
