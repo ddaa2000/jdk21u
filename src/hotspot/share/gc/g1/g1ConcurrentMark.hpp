@@ -399,7 +399,9 @@ class G1ConcurrentMark : public CHeapObj<mtGC> {
   void print_stats();
 
   HeapWord*           finger()       { return _finger;   }
+public:
   bool                concurrent()   { return _concurrent; }
+private:
   uint                active_tasks() { return _num_active_tasks; }
   TaskTerminator*     terminator()   { return &_terminator; }
 

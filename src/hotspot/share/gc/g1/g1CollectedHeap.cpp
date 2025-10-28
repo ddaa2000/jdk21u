@@ -1273,9 +1273,12 @@ G1CollectedHeap::G1CollectedHeap() :
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
   _region_attr(),
-  _lru_active_count(0),
-  _lru_inactive_count(0),
-  _lru_not_in_list_count(0) {
+  _lru_conc_active_count(0),
+  _lru_conc_inactive_count(0),
+  _lru_conc_not_in_list_count(0),
+  _lru_non_conc_active_count(0),
+  _lru_non_conc_inactive_count(0),
+  _lru_non_conc_not_in_list_count(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1544,17 +1547,23 @@ void G1CollectedHeap::stop() {
   LINUX_ONLY({
     if (total_lru_checked_count() > 0) {
       log_info(gc)("LRU Statistics Summary:");
-      log_info(gc)("  Active LRU pages: %zu", _lru_active_count);
-      log_info(gc)("  Inactive LRU pages: %zu", _lru_inactive_count);
-      log_info(gc)("  Not in LRU list: %zu", _lru_not_in_list_count);
+      log_info(gc)("  Conc Active LRU pages: %zu", _lru_conc_active_count);
+      log_info(gc)("  Conc Inactive LRU pages: %zu", _lru_conc_inactive_count);
+      log_info(gc)("  Conc Not in LRU list: %zu", _lru_conc_not_in_list_count);
+      log_info(gc)("  Non-conc Active LRU pages: %zu", _lru_non_conc_active_count);
+      log_info(gc)("  Non-conc Inactive LRU pages: %zu", _lru_non_conc_inactive_count);
+      log_info(gc)("  Non-conc Not in LRU list: %zu", _lru_non_conc_not_in_list_count);
       log_info(gc)("  Total pages checked: %zu", total_lru_checked_count());
       
       // Calculate percentages
       double total = (double)total_lru_checked_count();
       if (total > 0) {
-        log_info(gc)("  Active LRU percentage: %.2f%%", (100.0 * _lru_active_count) / total);
-        log_info(gc)("  Inactive LRU percentage: %.2f%%", (100.0 * _lru_inactive_count) / total);
-        log_info(gc)("  Not in LRU percentage: %.2f%%", (100.0 * _lru_not_in_list_count) / total);
+        log_info(gc)("  Conc Active LRU percentage: %.2f%%", (100.0 * _lru_conc_active_count) / total);
+        log_info(gc)("  Conc Inactive LRU percentage: %.2f%%", (100.0 * _lru_conc_inactive_count) / total);
+        log_info(gc)("  Conc Not in LRU percentage: %.2f%%", (100.0 * _lru_conc_not_in_list_count) / total);
+        log_info(gc)("  Non-conc Active LRU percentage: %.2f%%", (100.0 * _lru_non_conc_active_count) / total);
+        log_info(gc)("  Non-conc Inactive LRU percentage: %.2f%%", (100.0 * _lru_non_conc_inactive_count) / total);
+        log_info(gc)("  Non-conc Not in LRU percentage: %.2f%%", (100.0 * _lru_non_conc_not_in_list_count) / total);
       }
     }
   })
@@ -2260,8 +2269,11 @@ void G1CollectedHeap::print_on(outputStream* st) const {
   
   // Print LRU statistics
   LINUX_ONLY({
-    st->print("  LRU Statistics: Active=%zu, Inactive=%zu, NotInList=%zu (Total=%zu)",
-              _lru_active_count, _lru_inactive_count, _lru_not_in_list_count,
+    st->print("  LRU Conc Statistics: Active=%zu, Inactive=%zu, NotInList=%zu (Total=%zu)",
+              _lru_conc_active_count, _lru_conc_inactive_count, _lru_conc_not_in_list_count,
+              total_lru_checked_count());
+    st->print("  LRU Non-conc Statistics: Active=%zu, Inactive=%zu, NotInList=%zu (Total=%zu)",
+              _lru_non_conc_active_count, _lru_non_conc_inactive_count, _lru_non_conc_not_in_list_count,
               total_lru_checked_count());
     st->cr();
   })
@@ -2665,21 +2677,40 @@ void G1CollectedHeap::set_humongous_stats(uint num_humongous_total, uint num_hum
 }
 
 void G1CollectedHeap::update_lru_stats(os::LRUStatus status) {
-  switch (status) {
-    case os::LRU_ACTIVE:
-      _lru_active_count++;
-      break;
-    case os::LRU_INACTIVE:
-      _lru_inactive_count++;
-      break;
-    case os::LRU_NOT_IN_LIST:
-      _lru_not_in_list_count++;
-      break;
-    default:
-      // Unknown status, count as not in list
-      _lru_not_in_list_count++;
-      break;
+  if(_cm->concurrent()){
+    switch (status) {
+      case os::LRU_ACTIVE:
+        _lru_conc_active_count++;
+        break;
+      case os::LRU_INACTIVE:
+        _lru_conc_inactive_count++;
+        break;
+      case os::LRU_NOT_IN_LIST:
+        _lru_conc_not_in_list_count++;
+        break;
+      default:
+        // Unknown status, count as not in list
+        _lru_conc_not_in_list_count++;
+        break;
+    }
+  } else {
+    switch (status) {
+      case os::LRU_ACTIVE:
+        _lru_non_conc_active_count++;
+        break;
+      case os::LRU_INACTIVE:
+        _lru_non_conc_inactive_count++;
+        break;
+      case os::LRU_NOT_IN_LIST:
+        _lru_non_conc_not_in_list_count++;
+        break;
+      default:
+        // Unknown status, count as not in list
+        _lru_non_conc_not_in_list_count++;
+        break;
+    }
   }
+
 }
 
 bool G1CollectedHeap::should_sample_collection_set_candidates() const {

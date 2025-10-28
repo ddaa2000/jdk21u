@@ -262,18 +262,26 @@ public:
   void set_humongous_stats(uint num_humongous_total, uint num_humongous_candidates);
 
   // LRU status statistics accessors
-  size_t lru_active_count() const { return _lru_active_count; }
-  size_t lru_inactive_count() const { return _lru_inactive_count; }
-  size_t lru_not_in_list_count() const { return _lru_not_in_list_count; }
+  size_t lru_conc_active_count() const { return _lru_conc_active_count; }
+  size_t lru_conc_inactive_count() const { return _lru_conc_inactive_count; }
+  size_t lru_conc_not_in_list_count() const { return _lru_conc_not_in_list_count; }
+  size_t lru_non_conc_active_count() const { return _lru_non_conc_active_count; }
+  size_t lru_non_conc_inactive_count() const { return _lru_non_conc_inactive_count; }
+  size_t lru_non_conc_not_in_list_count() const { return _lru_non_conc_not_in_list_count; }
+
   size_t total_lru_checked_count() const { 
-    return _lru_active_count + _lru_inactive_count + _lru_not_in_list_count; 
+    return _lru_conc_active_count + _lru_conc_inactive_count + _lru_conc_not_in_list_count + 
+           _lru_non_conc_active_count + _lru_non_conc_inactive_count + _lru_non_conc_not_in_list_count; 
   }
   
   // Reset LRU statistics
   void reset_lru_stats() {
-    _lru_active_count = 0;
-    _lru_inactive_count = 0;
-    _lru_not_in_list_count = 0;
+    _lru_conc_active_count = 0;
+    _lru_conc_inactive_count = 0;
+    _lru_conc_not_in_list_count = 0;
+    _lru_non_conc_active_count = 0;
+    _lru_non_conc_inactive_count = 0;
+    _lru_non_conc_not_in_list_count = 0;
   }
   
   // Update LRU statistics (thread-safe)
@@ -1063,9 +1071,12 @@ public:
   G1HeapRegionAttrBiasedMappedArray _region_attr;
 
   // LRU status statistics during concurrent marking
-  size_t _lru_active_count;    // Count of pages in active LRU list
-  size_t _lru_inactive_count; // Count of pages in inactive LRU list
-  size_t _lru_not_in_list_count; // Count of pages not in LRU list
+  size_t _lru_conc_active_count;    // Count of pages in active LRU list
+  size_t _lru_conc_inactive_count; // Count of pages in inactive LRU list
+  size_t _lru_conc_not_in_list_count; // Count of pages not in LRU list
+  size_t _lru_non_conc_active_count;    // Count of pages in active LRU list
+  size_t _lru_non_conc_inactive_count; // Count of pages in inactive LRU list
+  size_t _lru_non_conc_not_in_list_count; // Count of pages not in LRU list
 
  public:
 

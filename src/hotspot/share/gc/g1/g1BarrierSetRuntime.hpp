@@ -22,33 +22,38 @@
  *
  */
 
-#ifndef SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
-#define SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
-
-#include "gc/g1/g1CardTable.hpp"
-#include "memory/allStatic.hpp"
-#include "oops/oopsHierarchy.hpp"
-#include "utilities/globalDefinitions.hpp"
-#include "utilities/macros.hpp"
-
-class oopDesc;
-class JavaThread;
-
-class G1BarrierSetRuntime: public AllStatic {
-public:
-  using CardValue = G1CardTable::CardValue;
-
-  // Arraycopy stub generator
-  static void write_ref_array_pre_oop_entry(oop* dst, size_t length);
-  static void write_ref_array_pre_narrow_oop_entry(narrowOop* dst, size_t length);
-  static void write_ref_array_post_entry(HeapWord* dst, size_t length);
-
-  // C2 slow-path runtime calls.
-  static void write_ref_field_pre_entry(oopDesc* orig, JavaThread *thread);
-  static void write_ref_field_post_entry(volatile CardValue* card_addr, JavaThread* thread);
-
-  static void load_ref_field_entry(oopDesc* new_val, JavaThread* thread);
-
-};
-
-#endif // SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
+ #ifndef SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
+ #define SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
+ 
+ #include "gc/g1/g1CardTable.hpp"
+ #include "memory/allStatic.hpp"
+ #include "oops/oopsHierarchy.hpp"
+ #include "utilities/globalDefinitions.hpp"
+ #include "utilities/macros.hpp"
+ 
+ class oopDesc;
+ class JavaThread;
+ 
+ class G1BarrierSetRuntime: public AllStatic {
+ public:
+   using CardValue = G1CardTable::CardValue;
+ 
+   // Arraycopy stub generator
+   static void write_ref_array_pre_oop_entry(oop* dst, size_t length);
+   static void write_ref_array_pre_narrow_oop_entry(narrowOop* dst, size_t length);
+   static void write_ref_array_post_entry(HeapWord* dst, size_t length);
+ 
+   // C2 slow-path runtime calls.
+   static void write_ref_field_pre_entry(oopDesc* orig, JavaThread *thread);
+   static void write_ref_field_post_entry(volatile CardValue* card_addr, JavaThread* thread);
+ 
+ 
+   // Haoran: modify
+   static void write_ref_field_prefetch_entry_asm(oopDesc* new_val, JavaThread* thread);
+   static void write_ref_field_prefetch_entry_c1(oopDesc* new_val, JavaThread* thread);
+   static void write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread);
+ 
+ };
+ 
+ #endif // SHARE_GC_G1_G1BARRIERSETRUNTIME_HPP
+ 

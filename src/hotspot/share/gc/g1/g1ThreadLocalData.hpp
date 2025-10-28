@@ -21,87 +21,109 @@
  * questions.
  */
 
-#ifndef SHARE_GC_G1_G1THREADLOCALDATA_HPP
-#define SHARE_GC_G1_G1THREADLOCALDATA_HPP
-
-#include "gc/g1/g1BarrierSet.hpp"
-#include "gc/g1/g1DirtyCardQueue.hpp"
-#include "gc/shared/gc_globals.hpp"
-#include "gc/shared/satbMarkQueue.hpp"
-#include "runtime/javaThread.hpp"
-#include "utilities/debug.hpp"
-#include "utilities/sizes.hpp"
-
-class G1ThreadLocalData {
-private:
-  SATBMarkQueue _satb_mark_queue;
-  G1DirtyCardQueue _dirty_card_queue;
-  size_t _lru_sample_counter;
-
-  G1ThreadLocalData() :
-      _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
-      _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()),
-      _lru_sample_counter(10000) {}
-
-public:
-  static G1ThreadLocalData* data(Thread* thread) {
-    assert(UseG1GC, "Sanity");
-    return thread->gc_data<G1ThreadLocalData>();
-  }
-private:
-
-  static ByteSize satb_mark_queue_offset() {
-    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _satb_mark_queue);
-  }
-
-  static ByteSize dirty_card_queue_offset() {
-    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _dirty_card_queue);
-  }
-
-public:
-  static void create(Thread* thread) {
-    new (data(thread)) G1ThreadLocalData();
-  }
-
-  static void destroy(Thread* thread) {
-    data(thread)->~G1ThreadLocalData();
-  }
-
-  static SATBMarkQueue& satb_mark_queue(Thread* thread) {
-    return data(thread)->_satb_mark_queue;
-  }
-
-  static G1DirtyCardQueue& dirty_card_queue(Thread* thread) {
-    return data(thread)->_dirty_card_queue;
-  }
-
-  static ByteSize satb_mark_queue_active_offset() {
-    return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_active();
-  }
-
-  static ByteSize satb_mark_queue_index_offset() {
-    return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_index();
-  }
-
-  static ByteSize satb_mark_queue_buffer_offset() {
-    return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_buf();
-  }
-
-  static ByteSize dirty_card_queue_index_offset() {
-    return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_index();
-  }
-
-  static ByteSize dirty_card_queue_buffer_offset() {
-    return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_buf();
-  }
-
-  void reset_lru_sample_counter() {
-    _lru_sample_counter = 10000;
-  }
-
-  static ByteSize lru_sample_counter_offset() {
-    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _lru_sample_counter);
-  }
-};
-
-#endif // SHARE_GC_G1_G1THREADLOCALDATA_HPP
+ #ifndef SHARE_GC_G1_G1THREADLOCALDATA_HPP
+ #define SHARE_GC_G1_G1THREADLOCALDATA_HPP
+ 
+ #include "gc/g1/g1BarrierSet.hpp"
+ #include "gc/g1/g1DirtyCardQueue.hpp"
+ #include "gc/shared/gc_globals.hpp"
+ #include "gc/shared/satbMarkQueue.hpp"
+ #include "runtime/javaThread.hpp"
+ #include "utilities/debug.hpp"
+ #include "utilities/sizes.hpp"
+ 
+ #include "gc/g1/g1CollectedHeap.hpp"
+ 
+ class G1ThreadLocalData {
+ private:
+   SATBMarkQueue _satb_mark_queue;
+   G1DirtyCardQueue _dirty_card_queue;
+ 
+  //  PrefetchQueue  _prefetch_queue;
+ public:
+   size_t _load_count;
+ 
+   G1ThreadLocalData() :
+       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
+       _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()),
+      //  _prefetch_queue(&(((G1CollectedHeap*)Universe::heap())->prefetch_queue_set())),
+       _load_count(0) {}
+ 
+   static G1ThreadLocalData* data(Thread* thread) {
+     assert(UseG1GC, "Sanity");
+     return thread->gc_data<G1ThreadLocalData>();
+   }
+ 
+   static ByteSize satb_mark_queue_offset() {
+     return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _satb_mark_queue);
+   }
+ 
+   static ByteSize dirty_card_queue_offset() {
+     return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _dirty_card_queue);
+   }
+ 
+     
+  //  static ByteSize prefetch_queue_offset() {
+  //    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _prefetch_queue);
+  //  }
+ 
+ public:
+   static void create(Thread* thread) {
+     new (data(thread)) G1ThreadLocalData();
+   }
+ 
+   static void destroy(Thread* thread) {
+     data(thread)->~G1ThreadLocalData();
+   }
+ 
+   static SATBMarkQueue& satb_mark_queue(Thread* thread) {
+     return data(thread)->_satb_mark_queue;
+   }
+ 
+   static G1DirtyCardQueue& dirty_card_queue(Thread* thread) {
+     return data(thread)->_dirty_card_queue;
+   }
+ 
+  //  static PrefetchQueue& prefetch_queue(Thread* thread) {
+  //    return data(thread)->_prefetch_queue;
+  //  }
+ 
+   static ByteSize satb_mark_queue_active_offset() {
+     return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_active();
+   }
+ 
+   static ByteSize satb_mark_queue_index_offset() {
+     return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_index();
+   }
+ 
+   static ByteSize satb_mark_queue_buffer_offset() {
+     return satb_mark_queue_offset() + SATBMarkQueue::byte_offset_of_buf();
+   }
+ 
+   static ByteSize dirty_card_queue_index_offset() {
+     return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_index();
+   }
+ 
+   static ByteSize dirty_card_queue_buffer_offset() {
+     return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_buf();
+   }
+ 
+  //  static ByteSize prefetch_queue_active_offset() {
+  //    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_active();
+  //  }
+ 
+  //  static ByteSize prefetch_queue_index_offset() {
+  //    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_index();
+  //  }
+ 
+  //  static ByteSize prefetch_queue_buffer_offset() {
+  //    return prefetch_queue_offset() + PrefetchQueue::byte_offset_of_buf();
+  //  }
+ 
+   static ByteSize load_count_offset() {
+     return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _load_count);
+   }
+ };
+ 
+ #endif // SHARE_GC_G1_G1THREADLOCALDATA_HPP
+ 

@@ -65,13 +65,29 @@ JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_post_entry(volatile G1CardTa
   G1BarrierSet::dirty_card_queue_set().enqueue(queue, card_addr);
 JRT_END
 
-JRT_LEAF(void, G1BarrierSetRuntime::load_ref_field_entry(oopDesc* new_val, JavaThread* thread))
+// JRT_LEAF(void, G1BarrierSetRuntime::load_ref_field_entry(oopDesc* new_val, JavaThread* thread))
+//   assert(thread == JavaThread::current(), "pre-condition");
+//   assert(new_val != nullptr, "should be optimized out");
+//   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+//   os::LRUStatus lru_status = os::check_page_lru_status(new_val);
+//   G1CollectedHeap* g1h = G1CollectedHeap::heap();
+//   g1h->update_lru_stats(lru_status);
+//   G1ThreadLocalData::data(thread)->reset_lru_sample_counter();
+//   log_info(gc)("load barrier called");
+// JRT_END
+
+JRT_LEAF(void, G1BarrierSetRuntime::write_ref_field_prefetch_entry_c2(oopDesc* new_val, JavaThread* thread))
   assert(thread == JavaThread::current(), "pre-condition");
   assert(new_val != nullptr, "should be optimized out");
   assert(oopDesc::is_oop(new_val, true /* ignore mark word */), "Error");
+  // log_info(gc)("load c2");
   os::LRUStatus lru_status = os::check_page_lru_status(new_val);
   G1CollectedHeap* g1h = G1CollectedHeap::heap();
   g1h->update_lru_stats(lru_status);
-  G1ThreadLocalData::data(thread)->reset_lru_sample_counter();
-  log_info(gc)("load barrier called");
+  // G1CollectedHeap* heap = G1CollectedHeap::heap();
+  // if(heap->is_in_young(new_val)){
+  //   heap->policy()->inc_young_load_count();
+  // } else {
+  //   heap->policy()->inc_old_load_count();
+  // }
 JRT_END
