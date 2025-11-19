@@ -225,53 +225,26 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
                 // log_info(gc)("found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
                 return data_structure;
             } 
+            if(data_structure->alloc_region_remaining_percentage() >= 0.1){
+                return data_structure;
+            } else {
+                MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+                OrderAccess::storestore();
+                data_structure = new G1DataStructureRegionSet(g1h, nullptr _present_id);data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
+                _data_structures.add(data_structure);
+                _present_id++;
+                return data_structure;
+            }
             // else {
             //     log_info(gc)("not found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
             // }
-        } else if(from_region->is_humongous()){
-            // log_info(gc)("humongous region %u", from_region->hrm_index());
-            data_structure_type = get_data_structure_by_root(from_symbol);
-
-            if(data_structure_type != nullptr){
-                MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
-                OrderAccess::storestore();
-                if (from_region->data_structure() == nullptr) {
-                    data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
-                    if(_allocator == nullptr || _evacuation_info == nullptr) {
-                        ShouldNotReachHere();
-                    }
-
-                    {
-                        log_info(gc)("create data structure for obj %p, class %s, at %p, id %u", to_oop, from_symbol->as_C_string(), data_structure, _present_id);
-                        // log_info(gc)("create data structure for obj %p, class %s", to_oop, from_symbol->as_C_string());
-                        data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
-                        _data_structures.add(data_structure);
-                        _present_id++;
-                    }
-
-                    data_structure->add_region(from_region);
-                    from_region->set_data_structure(data_structure);
-                    from_region->set_collect_as_a_whole(true);
-
-
-                    for(uint i = from_region->hrm_index() + 1; i < g1h->max_regions(); i++){
-                        HeapRegion* hr = g1h->region_at_or_null(i);
-                        if(hr == nullptr || !hr->is_continues_humongous()){
-                            break;
-                        }
-                        data_structure->add_region(hr);
-                        hr->set_data_structure(data_structure);
-                        hr->set_collect_as_a_whole(true);
-                    }
-                    return data_structure;
-                } else {
-                    data_structure = from_region->data_structure();
-                    if (data_structure->find_edge(from_symbol, to_symbol) != nullptr) {
-                        // log_info(gc)("found %s to %s", from_symbol->as_C_string(), to_symbol->as_C_string());
-                        return data_structure;
-                    }
-                }
-            }
+        } else {
+            MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
+            OrderAccess::storestore();
+            data_structure = new G1DataStructureRegionSet(g1h, nullptr _present_id);data_structure->init_data_structure_alloc_region(_allocator, _evacuation_info);
+            _data_structures.add(data_structure);
+            _present_id++;
+            return data_structure;
         }
         // else {
         //     LinkedListNode<G1DataStructure*>* p = _data_structure_types.head();

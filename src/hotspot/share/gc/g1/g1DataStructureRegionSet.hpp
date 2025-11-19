@@ -208,6 +208,13 @@ public:
         _retained_old_region = nullptr;
     }
 
+    double alloc_region_remaining_percentage(){
+        if(_alloc_region.get() == nullptr){
+            return 0;
+        }
+        return _alloc_region.get()->free() * 1.0 / _alloc_region.get()->capacity();
+    }
+
     template<typename Func> void scan_cards(Func&& f);
 
     template<typename Func> void scan_out_instances(Func&& f) {
