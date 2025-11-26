@@ -22,16 +22,24 @@
  *
  */
 
-#ifndef SHARE_GC_G1_G1OOPQUEUESET_HPP
-#define SHARE_GC_G1_G1OOPQUEUESET_HPP
+#ifndef SHARE_GC_G1_G1OOPQUEUE_HPP
+#define SHARE_GC_G1_G1OOPQUEUE_HPP
 
-#include "oops/oop.hpp"
+// #include "oops/oop.hpp"
+#include "oops/oopsHierarchy.hpp"
+#include "runtime/threadSMR.hpp"
+#include "utilities/sizes.hpp"
 
+class G1ThreadLocalData;
+class ReferenceHashMap;
 
 class G1OopQueue : CHeapObj<mtGC> {
 private:
   oopDesc** _buffer;
   size_t _index;
+  static const size_t _element_size = sizeof(oopDesc*);
+  size_t _total_count, _young_count, _identical_count;
+
 public:
   G1OopQueue();
   ~G1OopQueue();
@@ -48,11 +56,24 @@ public:
     return byte_offset_of(G1OopQueue, _index);
   }
 
-  static void flush_all(){
-    for (JavaThreadIteratorWithHandle jtiwh; JavaThread *thread = jtiwh.next();) {
-      G1OopQueue& queue = G1ThreadLocalData::ref_queue(thread);
-      queue.flush();
-    }
+  static void flush_all();
+
+  static size_t byte_index_to_index(size_t ind) {
+    assert(is_aligned(ind, _element_size), "precondition");
+    return ind / _element_size;
+  }
+
+  static size_t index_to_byte_index(size_t ind) {
+    return ind * _element_size;
+  }
+
+  size_t index() const {
+    return byte_index_to_index(_index);
+  }
+
+  void set_index(size_t new_index) {
+    assert(new_index <= capacity(), "precondition");
+    _index = index_to_byte_index(new_index);
   }
 };
 

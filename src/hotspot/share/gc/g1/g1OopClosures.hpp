@@ -164,7 +164,7 @@ class G1ScanEvacuatedObjClosure : public G1ScanClosureBase {
 
 public:
   G1ScanEvacuatedObjClosure(G1CollectedHeap* g1h, G1ParScanThreadState* par_scan_state) :
-    G1ScanClosureBase(g1h, par_scan_state), _skip_card_enqueue(Uninitialized), 
+    G1ScanClosureBase(g1h, par_scan_state), _skip_card_enqueue(Uninitialized),
     _from_oop(nullptr), _from_klass_name(nullptr) { }
 
   template <class T> void do_oop_work(T* p);

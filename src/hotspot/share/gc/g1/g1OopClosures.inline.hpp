@@ -220,7 +220,7 @@ inline void G1ScanDataStructureOutCardClosure::rebuild_remset(T* p) {
 
   if (rem_set->is_tracked()) {
     rem_set->add_reference(p, _cm_task->worker_id());
-  } 
+  }
   // else {
   //   ShouldNotReachHere();
   // }
@@ -267,7 +267,7 @@ inline void G1ScanDataStructureOutCardClosure::do_oop_work(T* p) {
   }
 
   // log_info(gc)("before deal with ds");
-  
+
   _cm_task->deal_with_reference_ds(p, data_structure_instance);
 
   // log_info(gc)("after deal with ds");

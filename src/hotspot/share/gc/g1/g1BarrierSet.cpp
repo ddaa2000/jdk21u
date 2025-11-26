@@ -160,6 +160,9 @@ void G1BarrierSet::on_thread_attach(Thread* thread) {
 
 void G1BarrierSet::on_thread_detach(Thread* thread) {
   // Flush any deferred card marks.
+  // if(!thread->is_Java_thread()){
+  //   ShouldNotReachHere();
+  // }
   CardTableBarrierSet::on_thread_detach(thread);
   {
     SATBMarkQueue& queue = G1ThreadLocalData::satb_mark_queue(thread);
@@ -167,7 +170,9 @@ void G1BarrierSet::on_thread_detach(Thread* thread) {
     G1OopQueue& oop_queue = G1ThreadLocalData::ref_queue(thread);
     oop_queue.flush(map);
     G1CollectedHeap* g1h = G1CollectedHeap::heap();
+    // log_info(gc)("before merge remove");
     g1h->merge_remove_hash_map(&map);
+    // log_info(gc)("after merge remove");
     G1BarrierSet::satb_mark_queue_set().flush_queue(queue);
   }
   {

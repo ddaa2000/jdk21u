@@ -37,14 +37,16 @@
 class G1ThreadLocalData {
 private:
   SATBMarkQueue _satb_mark_queue;
-  G1OopQueue _ref_queue;
   G1DirtyCardQueue _dirty_card_queue;
   ReferenceHashMap _reference_hash_map;
+  G1OopQueue _ref_queue;
+
 
   G1ThreadLocalData() :
       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
-      _ref_queue(),
-      _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()) {}
+      _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()),
+      _reference_hash_map(10 /* initial size */),
+      _ref_queue() {}
 
   static G1ThreadLocalData* data(Thread* thread) {
     assert(UseG1GC, "Sanity");

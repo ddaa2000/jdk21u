@@ -24,38 +24,77 @@
 
 #include "precompiled.hpp"
 #include "gc/g1/g1OopQueue.hpp"
-#include "gc/g1/heapRegion.hpp"
-#include "gc/shared/satbMarkQueue.hpp"
-#include "oops/oop.hpp"
-#include "utilities/debug.hpp"
-#include "utilities/globalDefinitions.hpp"
+#include "gc/g1/g1ThreadLocalData.hpp"
+#include "gc/g1/g1CollectedHeap.hpp"
+#include "gc/g1/g1CollectedHeap.inline.hpp"
+#include "oops/oop.inline.hpp"
+#include "logging/log.hpp"
 
 G1OopQueue::G1OopQueue() :
   _buffer(nullptr),
-  _index(G1OopBufferSize * 2),
-{
-  _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
-}
+  _index(0),
+  _total_count(0), _young_count(0), _identical_count(0) {
+    _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
+    set_index(G1OopBufferSize * 2);
+  }
 
-G1OopQueue::~G1OopQueue() : {
-  delete[] _buffer;
+G1OopQueue::~G1OopQueue(){
+  FREE_C_HEAP_ARRAY(oopDesc*, _buffer);
+  log_info(gc)("G1OopQueue: total_count: %zu, young_percent: %lf, identical_percent: %lf", 
+              _total_count,
+              _young_count * 100.0 / _total_count,
+              _identical_count * 100.0 / (_total_count - _young_count));
 }
 
 void G1OopQueue::flush(ReferenceHashMap& map) {
-  for(size_t i = G1OopBufferSize * 2 - 2; i >= _index; i -= 2 ){
+  G1CollectedHeap* g1h = G1CollectedHeap::heap();
+  size_t idx = index();
+  Symbol* pre_from = nullptr;
+  Symbol* pre_to = nullptr;
+  size_t pre_count = 0;
+  size_t pre_size = 0;
+  for(size_t i = idx; i < G1OopBufferSize * 2; i += 2 ){
     oopDesc* from = _buffer[i];
     oopDesc* to = _buffer[i + 1];
-    map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
+    _total_count += 1;
+    if(g1h->heap_region_containing(to)->is_young() || g1h->heap_region_containing(from)->is_young()){
+      _young_count += 1;
+      continue;
+    }
+    if(pre_from == from->klass()->name() && pre_to == to->klass()->name()){
+      pre_count++;
+      pre_size += to->size();
+      _identical_count += 1;
+    } else {
+      if(pre_from != nullptr){
+        map.add_or_inc(pre_from, pre_to, pre_count, pre_size);
+      }
+      pre_from = from->klass()->name();
+      pre_to = to->klass()->name();
+      pre_count = 1;
+      pre_size = to->size();
+    }
+    // map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
   }
-  _index = G1OopBufferSize * 2;
+  set_index(G1OopBufferSize * 2);
 }
 
 void G1OopQueue::enqueue(ReferenceHashMap& map, oopDesc* from, oopDesc* to){
-  if(_index == 0){
+  size_t idx = index();
+  if(idx == 0){
     flush(map);
+    idx = index();
   }
-  _index -= 2;
-  buffer[_index] = from;
-  buffer[_index + 1] = to;
+  idx -= 2;
+  _buffer[idx] = from;
+  _buffer[idx + 1] = to;
+  set_index(idx);
 }
 
+void G1OopQueue::flush_all(){
+  for (JavaThreadIteratorWithHandle jtiwh; JavaThread *thread = jtiwh.next();) {
+    G1OopQueue& queue = G1ThreadLocalData::ref_queue(thread);
+    ReferenceHashMap& map = G1ThreadLocalData::reference_hash_map(thread);
+    queue.flush(map);
+  }
+}
