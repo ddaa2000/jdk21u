@@ -162,6 +162,10 @@
           "Number of entries in an SATB log buffer.")                       \
           range(1, max_uintx)                                               \
                                                                             \
+  product(size_t, G1OopBufferSize, 1*K,                                     \
+          "Number of entries in an oop log buffer.")                        \
+          range(1, max_uintx)                                               \
+                                                                            \
   develop(intx, G1SATBProcessCompletedThreshold, 20,                        \
           "Number of completed buffers that triggers log processing.")      \
           range(0, max_jint)                                                \

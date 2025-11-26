@@ -1246,6 +1246,8 @@ G1CollectedHeap::G1CollectedHeap() :
   _reference_hash_map(20),
   _data_structure_manager(),
   _region_class_hash_map(),
+  _remove_hash_map(20),
+  _remove_hash_map_lock(Mutex::nosafepoint, "remove hash map lock"),
   _listener(),
   _numa(G1NUMA::create()),
   _hrm(),
@@ -1556,6 +1558,9 @@ void G1CollectedHeap::stop() {
   // that are destroyed during shutdown.
   reference_hash_map()->print_all();
   log_info(gc)("size copied: %lu", _size_copied);
+  // reference_hash_map()->print_all();
+  log_info(gc)("remove hash map start");
+  remove_hash_map()->print_all();
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();

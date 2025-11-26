@@ -49,6 +49,7 @@
 #include "gc/g1/g1_globals.hpp"
 #include "gc/g1/g1ParRefineTask.hpp"
 #include "gc/g1/g1FlushLogBufferBatchTask.hpp"
+#include "gc/g1/g1OopQueue.hpp"
 #include "gc/shared/concurrentGCBreakpoints.hpp"
 #include "gc/shared/gcTraceTime.inline.hpp"
 #include "gc/shared/gcTimer.hpp"
@@ -1042,6 +1043,8 @@ void G1YoungCollector::collect() {
   G1HeapPrinterMark hpm(_g1h);
   // Young GC internal pause timing
   G1YoungGCNotifyPauseMark npm(this);
+
+  G1OopQueue::flush_all();
 
   // Verification may use the workers, so they must be set up before.
   // Individual parallel phases may override this.

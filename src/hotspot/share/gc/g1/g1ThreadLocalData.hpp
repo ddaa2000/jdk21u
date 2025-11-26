@@ -26,8 +26,10 @@
 
 #include "gc/g1/g1BarrierSet.hpp"
 #include "gc/g1/g1DirtyCardQueue.hpp"
+#include "gc/g1/g1OopQueue.hpp"
 #include "gc/shared/gc_globals.hpp"
 #include "gc/shared/satbMarkQueue.hpp"
+#include "gc/shared/referenceHashMap.hpp"
 #include "runtime/javaThread.hpp"
 #include "utilities/debug.hpp"
 #include "utilities/sizes.hpp"
@@ -35,10 +37,13 @@
 class G1ThreadLocalData {
 private:
   SATBMarkQueue _satb_mark_queue;
+  G1OopQueue _ref_queue;
   G1DirtyCardQueue _dirty_card_queue;
+  ReferenceHashMap _reference_hash_map;
 
   G1ThreadLocalData() :
       _satb_mark_queue(&G1BarrierSet::satb_mark_queue_set()),
+      _ref_queue(),
       _dirty_card_queue(&G1BarrierSet::dirty_card_queue_set()) {}
 
   static G1ThreadLocalData* data(Thread* thread) {
@@ -54,6 +59,10 @@ private:
     return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _dirty_card_queue);
   }
 
+  static ByteSize ref_queue_offset() {
+    return Thread::gc_data_offset() + byte_offset_of(G1ThreadLocalData, _ref_queue);
+  }
+
 public:
   static void create(Thread* thread) {
     new (data(thread)) G1ThreadLocalData();
@@ -67,8 +76,16 @@ public:
     return data(thread)->_satb_mark_queue;
   }
 
+  static G1OopQueue& ref_queue(Thread* thread) {
+    return data(thread)->_ref_queue;
+  }
+
   static G1DirtyCardQueue& dirty_card_queue(Thread* thread) {
     return data(thread)->_dirty_card_queue;
+  }
+
+  static ReferenceHashMap& reference_hash_map(Thread* thread) {
+    return data(thread)->_reference_hash_map;
   }
 
   static ByteSize satb_mark_queue_active_offset() {
@@ -89,6 +106,14 @@ public:
 
   static ByteSize dirty_card_queue_buffer_offset() {
     return dirty_card_queue_offset() + G1DirtyCardQueue::byte_offset_of_buf();
+  }
+
+  static ByteSize ref_queue_index_offset() {
+    return ref_queue_offset() + G1OopQueue::byte_offset_of_index();
+  }
+
+  static ByteSize ref_queue_buf_offset() {
+    return ref_queue_offset() + G1OopQueue::byte_offset_of_buf();
   }
 };
 

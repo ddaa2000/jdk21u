@@ -19,27 +19,43 @@
  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
  * or visit www.oracle.com if you need additional information or have any
  * questions.
+ *
  */
 
-#ifndef SHARE_GC_SHARED_GCTHREADLOCALDATA_HPP
-#define SHARE_GC_SHARED_GCTHREADLOCALDATA_HPP
-
+#include "precompiled.hpp"
+#include "gc/g1/g1OopQueue.hpp"
+#include "gc/g1/heapRegion.hpp"
+#include "gc/shared/satbMarkQueue.hpp"
+#include "oops/oop.hpp"
+#include "utilities/debug.hpp"
 #include "utilities/globalDefinitions.hpp"
 
-// Thread local data area for GC-specific information. Each GC
-// is free to decide the internal structure and contents of this
-// area. It is represented as a 64-bit aligned opaque blob to
-// avoid circular dependencies between Thread and all GCs. For
-// the same reason, the size of the data area is hard coded to
-// provide enough space for all current GCs. Adjust the size if
-// needed, but avoid making it excessively large as it adds to
-// the memory overhead of creating a thread.
-//
-// Use Thread::gc_data<T>() to access the data, where T is the
-// GC-specific type describing the structure of the data. GCs
-// should consider placing frequently accessed fields first in
-// T, so that field offsets relative to Thread are small, which
-// often allows for a more compact instruction encoding.
-typedef uint64_t GCThreadLocalData[100]; // 344 bytes
+G1OopQueue::G1OopQueue() :
+  _buffer(nullptr),
+  _index(G1OopBufferSize * 2),
+{
+  _buffer = NEW_C_HEAP_ARRAY(oopDesc*, G1OopBufferSize * 2, mtGC);
+}
 
-#endif // SHARE_GC_SHARED_GCTHREADLOCALDATA_HPP
+G1OopQueue::~G1OopQueue() : {
+  delete[] _buffer;
+}
+
+void G1OopQueue::flush(ReferenceHashMap& map) {
+  for(size_t i = G1OopBufferSize * 2 - 2; i >= _index; i -= 2 ){
+    oopDesc* from = _buffer[i];
+    oopDesc* to = _buffer[i + 1];
+    map.add_or_inc(from->klass()->name(), to->klass()->name(), 1, to->size());
+  }
+  _index = G1OopBufferSize * 2;
+}
+
+void G1OopQueue::enqueue(ReferenceHashMap& map, oopDesc* from, oopDesc* to){
+  if(_index == 0){
+    flush(map);
+  }
+  _index -= 2;
+  buffer[_index] = from;
+  buffer[_index + 1] = to;
+}
+

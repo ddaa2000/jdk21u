@@ -3,6 +3,7 @@
 
 #include "oops/symbolHandle.hpp"
 #include "utilities/ostream.hpp"
+#include "logging/log.hpp"
 
 
 class ReferenceEntry : public CHeapObj<mtGC> {

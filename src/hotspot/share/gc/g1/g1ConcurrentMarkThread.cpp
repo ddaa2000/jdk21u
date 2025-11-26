@@ -33,6 +33,7 @@
 #include "gc/g1/g1RemSet.hpp"
 #include "gc/g1/g1Trace.hpp"
 #include "gc/g1/g1VMOperations.hpp"
+#include "gc/g1/g1OopQueue.hpp"
 #include "gc/shared/concurrentGCBreakpoints.hpp"
 #include "gc/shared/gcId.hpp"
 #include "gc/shared/gcTraceTime.inline.hpp"
