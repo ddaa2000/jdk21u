@@ -203,6 +203,7 @@ private:
 
   ReferenceHashMap _reference_hash_map;
   G1DataStructureManager _data_structure_manager;
+  RegionClassHashMap _region_class_hash_map;
   ReferenceHashMap _remove_hash_map;
   Mutex _remove_hash_map_lock;
   // ReferenceDictionary* _reference_dictionary;
@@ -219,7 +220,6 @@ private:
     }
   };
 
-  RegionClassHashMap _region_class_hash_map;
 
   class MergeRegionClassClosure {
     public:
@@ -1407,6 +1407,19 @@ public:
 
   size_t get_size_copied() const {
     return _size_copied;
+  }
+
+private:
+  size_t _ds_count;
+  size_t _ds_violated_count;
+
+public:
+  void inc_ds_count(){
+    _ds_count++;
+  }
+
+  void inc_ds_violated_count(){
+    _ds_violated_count++;
   }
 };
 

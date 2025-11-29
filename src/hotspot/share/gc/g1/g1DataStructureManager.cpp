@@ -237,6 +237,7 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
                 OrderAccess::storestore();
                 if (from_region->data_structure() == nullptr) {
                     data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
+                    g1h->inc_ds_count();
                     if(_allocator == nullptr || _evacuation_info == nullptr) {
                         ShouldNotReachHere();
                     }
@@ -286,6 +287,8 @@ G1DataStructureRegionSet* G1DataStructureManager::get_data_structure(oop from_oo
     if (data_structure_type != nullptr) {
         MutexLocker ml(&_data_structures_lock, Mutex::_no_safepoint_check_flag);
         data_structure = new G1DataStructureRegionSet(g1h, data_structure_type, _present_id);
+        g1h->inc_ds_count();
+    
         if(_allocator == nullptr || _evacuation_info == nullptr) {
             ShouldNotReachHere();
         }

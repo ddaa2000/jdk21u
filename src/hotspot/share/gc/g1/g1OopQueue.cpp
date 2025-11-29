@@ -57,10 +57,19 @@ void G1OopQueue::flush(ReferenceHashMap& map) {
     oopDesc* from = _buffer[i];
     oopDesc* to = _buffer[i + 1];
     _total_count += 1;
-    if(g1h->heap_region_containing(to)->is_young() || g1h->heap_region_containing(from)->is_young()){
+    HeapRegion* from_region = g1h->heap_region_containing(from);
+    HeapRegion* to_region = g1h->heap_region_containing(to);
+    if(from_region->is_young() || to_region->is_young()){
       _young_count += 1;
       continue;
     }
+    if(from_region->data_structure() != nullptr && !from_region->data_structure()->is_violated()){
+      from_region->data_structure()->set_violated(true);
+      g1h->inc_ds_violated_count();
+    }
+
+
+
     if(pre_from == from->klass()->name() && pre_to == to->klass()->name()){
       pre_count++;
       pre_size += to->size();

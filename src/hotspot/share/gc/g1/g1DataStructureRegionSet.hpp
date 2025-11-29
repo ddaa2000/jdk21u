@@ -255,6 +255,16 @@ public:
 
     void find_out_card(HeapWord* addr);
 
+private:
+    bool _is_violated;
+public:
+    bool is_violated(){
+        return _is_violated;
+    }
+    void set_violated(bool is_violated){
+        _is_violated = is_violated;
+    }
+
 };
 
 class G1DataStructureRegionSetClosure : public Closure {

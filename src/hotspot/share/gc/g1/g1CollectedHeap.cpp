@@ -1286,7 +1286,9 @@ G1CollectedHeap::G1CollectedHeap() :
   _is_alive_closure_cm(this),
   _is_subject_to_discovery_cm(this),
   _region_attr(),
-  _size_copied(0) {
+  _size_copied(0),
+  _ds_count(0),
+  _ds_violated_count(0) {
 
   _verifier = new G1HeapVerifier(this);
 
@@ -1561,6 +1563,7 @@ void G1CollectedHeap::stop() {
   // reference_hash_map()->print_all();
   log_info(gc)("remove hash map start");
   remove_hash_map()->print_all();
+  log_info(gc)("ds total %lu, ds violation %lu, ds violation rate %.2lf", _ds_count, _ds_violated_count, _ds_violated_count * 100.0 / _ds_count);
   _cr->stop();
   _service_thread->stop();
   _cm_thread->stop();
